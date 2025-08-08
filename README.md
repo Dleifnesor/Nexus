@@ -446,21 +446,6 @@ nexus config set safety.audit_logging true
 nexus config set safety.evidence_collection true
 ```
 
-### Compliance Features
-- **SOC 2 Type II** compliance ready
-- **ISO 27001** audit trail support  
-- **NIST Cybersecurity Framework** alignment
-- **GDPR** data protection compliance
-
-## Performance Metrics
-
-### Benchmark Results
-- **Speed**: 10x faster than traditional tools
-- **Accuracy**: 94% vulnerability detection rate (vs 67% industry average)
-- **Stealth**: 0.3% average detection rate (vs 15% industry average)
-- **Intelligence**: 89% reduction in false positives
-- **Scalability**: Handles 100,000+ host environments
-
 ### System Requirements by Scale
 
 | Environment Size | RAM | CPU | Storage | Network |
@@ -589,5 +574,6 @@ Nexus is designed for authorized penetration testing and security research only.
 ---
 
 **Made with care by the Nexus Security Team**
+
 
 *Nexus: Where artificial intelligence meets cybersecurity excellence*
