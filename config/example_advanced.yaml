@@ -1,0 +1,428 @@
+# Nexus Advanced Configuration Example
+# This file demonstrates all available configuration options for Nexus
+# Copy to ~/.nexus/config/default.yaml and customize as needed
+
+# AI Configuration
+ai:
+  # Ollama settings
+  ollama_url: "http://localhost:11434"
+  model: "mlabonne/Qwen3-14B-abliterated"
+  temperature: 0.7
+  max_tokens: 2048
+  timeout: 300
+  
+  # Advanced AI system settings
+  correlation:
+    # Minimum confidence threshold for vulnerability correlation
+    min_confidence: 0.6
+    # Threshold for clustering similar vulnerabilities
+    cluster_threshold: 0.8
+    # Maximum number of clusters to generate
+    max_clusters: 20
+    # Enable AI-powered vulnerability extraction from tool outputs
+    ai_extraction: true
+    # Cache correlation results for performance
+    cache_results: true
+  
+  exploitation:
+    # Minimum success probability for exploit recommendations
+    min_success_probability: 0.3
+    # Weight given to stealth in exploit selection (0.0-1.0)
+    stealth_weight: 0.4
+    # Weight given to complexity in exploit selection (0.0-1.0)
+    complexity_weight: 0.3
+    # Maximum number of exploits to recommend per vulnerability
+    max_recommendations: 10
+    # Enable custom exploit script generation
+    generate_custom_scripts: true
+    # Include Metasploit modules in recommendations
+    include_metasploit: true
+    # Include Exploit-DB entries in recommendations
+    include_exploitdb: true
+  
+  planning:
+    # Maximum length of attack paths (number of steps)
+    max_path_length: 10
+    # Maximum number of attack paths to generate
+    max_paths: 20
+    # Optimization weights for path selection
+    optimization_weight:
+      success: 0.4      # Success probability weight
+      stealth: 0.3      # Stealth score weight
+      time: 0.3         # Time efficiency weight
+    # Enable graph-based attack modeling
+    use_attack_graphs: true
+    # Cache attack graphs for performance
+    cache_graphs: true
+    # Include MITRE ATT&CK technique mapping
+    include_mitre_mapping: true
+
+# Tool Configuration
+tools:
+  # Global tool settings
+  global:
+    # Default timeout for all tools (seconds)
+    default_timeout: 600
+    # Maximum concurrent tool executions
+    max_concurrent: 5
+    # Enable tool output caching
+    cache_outputs: true
+    # Cache duration in seconds
+    cache_duration: 3600
+  
+  # Network scanning tools
+  nmap:
+    path: "/usr/bin/nmap"
+    enabled: true
+    default_args: ["-sS", "-sV", "-O", "--script=default"]
+    timeout: 900
+    max_targets: 1000
+    rate_limit: 100  # packets per second
+  
+  masscan:
+    path: "/usr/bin/masscan"
+    enabled: true
+    default_args: ["--rate=1000"]
+    timeout: 300
+    max_targets: 10000
+  
+  # Web application testing tools
+  nikto:
+    path: "/usr/bin/nikto"
+    enabled: true
+    default_args: ["-C", "all"]
+    timeout: 1800
+    max_concurrent_scans: 3
+  
+  gobuster:
+    path: "/usr/bin/gobuster"
+    enabled: true
+    default_args: ["dir", "-t", "50"]
+    timeout: 600
+    wordlist: "/usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt"
+  
+  sqlmap:
+    path: "/usr/bin/sqlmap"
+    enabled: true
+    default_args: ["--batch", "--random-agent"]
+    timeout: 1800
+    risk_level: 1
+    level: 1
+  
+  # Exploitation tools
+  metasploit:
+    path: "/usr/share/metasploit-framework"
+    enabled: true
+    timeout: 1800
+    auto_exploit: false  # Require manual confirmation for exploits
+    payload_options:
+      default_payload: "generic/shell_reverse_tcp"
+      lhost: "auto"  # Auto-detect attacker IP
+      lport: 4444
+  
+  hydra:
+    path: "/usr/bin/hydra"
+    enabled: true
+    default_args: ["-t", "4", "-f"]
+    timeout: 3600
+    max_attempts: 1000
+    wordlists:
+      usernames: "/usr/share/wordlists/metasploit/unix_users.txt"
+      passwords: "/usr/share/wordlists/rockyou.txt"
+  
+  # Post-exploitation tools
+  linpeas:
+    path: "/opt/PEASS-ng/linPEAS/linpeas.sh"
+    enabled: true
+    timeout: 600
+    output_format: "color"
+  
+  winpeas:
+    path: "/opt/PEASS-ng/winPEAS/winPEASx64.exe"
+    enabled: true
+    timeout: 600
+    output_format: "color"
+
+# Safety and Scope Configuration
+safety:
+  # Enable comprehensive scope validation
+  scope_validation: true
+  
+  # Require manual confirmation for destructive actions
+  confirmation_required: true
+  
+  # Rate limiting settings
+  rate_limiting: true
+  max_requests_per_minute: 60
+  max_concurrent_scans: 5
+  
+  # Emergency controls
+  enable_kill_switch: true
+  kill_switch_key: "CTRL+C"
+  
+  # Scope definition
+  scope:
+    # Allowed IP ranges (CIDR notation)
+    allowed_ips:
+      - "192.168.1.0/24"
+      - "10.0.0.0/8"
+      - "172.16.0.0/12"
+    
+    # Allowed domains (supports wildcards)
+    allowed_domains:
+      - "*.example.com"
+      - "test.local"
+    
+    # Explicitly forbidden targets
+    forbidden_ips:
+      - "192.168.1.1"    # Gateway
+      - "192.168.1.10"   # DNS server
+    
+    forbidden_domains:
+      - "*.gov"
+      - "*.mil"
+      - "*.edu"
+    
+    # Port restrictions
+    forbidden_ports:
+      - 25    # SMTP
+      - 53    # DNS
+      - 123   # NTP
+  
+  # Audit and logging
+  audit_logging: true
+  log_level: "INFO"
+  log_retention_days: 90
+  
+  # Evidence handling
+  evidence_collection: true
+  evidence_encryption: true
+  chain_of_custody: true
+
+# Campaign Configuration
+campaigns:
+  # Default campaign settings
+  default:
+    # Campaign phases to execute
+    phases:
+      - "reconnaissance"
+      - "scanning"
+      - "enumeration"
+      - "exploitation"
+      - "post_exploitation"
+      - "persistence"
+    
+    # Phase-specific settings
+    reconnaissance:
+      passive_only: false
+      osint_sources: ["shodan", "censys", "virustotal"]
+      dns_enumeration: true
+      subdomain_enumeration: true
+    
+    scanning:
+      port_scan_type: "stealth"  # stealth, connect, udp
+      service_detection: true
+      os_detection: true
+      vulnerability_scanning: true
+    
+    enumeration:
+      web_enumeration: true
+      smb_enumeration: true
+      snmp_enumeration: true
+      directory_bruteforce: true
+    
+    exploitation:
+      auto_exploit: false
+      exploit_verification: true
+      payload_generation: true
+      custom_scripts: true
+    
+    post_exploitation:
+      privilege_escalation: true
+      lateral_movement: false  # Disabled by default for safety
+      data_collection: true
+      persistence_installation: false  # Disabled by default
+    
+    persistence:
+      install_backdoors: false  # Disabled by default
+      create_accounts: false    # Disabled by default
+      modify_startup: false     # Disabled by default
+
+# Reporting Configuration
+reporting:
+  # Default report settings
+  default_format: "html"
+  include_raw_output: true
+  include_screenshots: true
+  include_evidence: true
+  
+  # Report templates
+  templates:
+    executive: "templates/executive_summary.html"
+    technical: "templates/technical_report.html"
+    compliance: "templates/compliance_report.html"
+  
+  # Output directories
+  output_dir: "~/.nexus/reports"
+  evidence_dir: "~/.nexus/evidence"
+  
+  # Report customization
+  branding:
+    company_name: "Your Security Company"
+    logo_path: "assets/logo.png"
+    contact_info: "security@yourcompany.com"
+  
+  # Export options
+  export_formats: ["html", "pdf", "json"]
+  compress_reports: true
+  encrypt_reports: false
+
+# Dashboard Configuration
+dashboard:
+  # Web dashboard settings
+  enabled: true
+  host: "127.0.0.1"
+  port: 8080
+  auto_refresh: 30  # seconds
+  
+  # Authentication (if enabled)
+  authentication:
+    enabled: false
+    username: "admin"
+    password_hash: ""  # bcrypt hash
+  
+  # Data monitoring
+  monitoring:
+    data_directory: "~/.nexus/data"
+    watch_patterns: ["*.json", "*.xml", "*.txt"]
+    auto_analysis: true
+  
+  # Visualization settings
+  visualization:
+    attack_graphs: true
+    vulnerability_charts: true
+    timeline_view: true
+    risk_heatmaps: true
+
+# Logging Configuration
+logging:
+  # Log levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  level: "INFO"
+  
+  # Log destinations
+  console: true
+  file: true
+  syslog: false
+  
+  # File logging settings
+  file_settings:
+    path: "~/.nexus/logs/nexus.log"
+    max_size: "100MB"
+    backup_count: 5
+    rotation: "daily"
+  
+  # Syslog settings (if enabled)
+  syslog_settings:
+    facility: "local0"
+    address: "localhost"
+    port: 514
+  
+  # Log formatting
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  date_format: "%Y-%m-%d %H:%M:%S"
+  
+  # Component-specific logging
+  components:
+    ai: "DEBUG"
+    tools: "INFO"
+    safety: "WARNING"
+    campaigns: "INFO"
+
+# Performance Configuration
+performance:
+  # Memory management
+  max_memory_usage: "8GB"
+  cache_size: "1GB"
+  
+  # Concurrency settings
+  max_workers: 10
+  thread_pool_size: 20
+  
+  # Database settings (if using database storage)
+  database:
+    type: "sqlite"  # sqlite, postgresql, mysql
+    path: "~/.nexus/data/nexus.db"
+    connection_pool_size: 10
+  
+  # Optimization settings
+  optimization:
+    enable_caching: true
+    cache_ttl: 3600  # seconds
+    compress_data: true
+    lazy_loading: true
+
+# Integration Configuration
+integrations:
+  # External tool integrations
+  shodan:
+    enabled: false
+    api_key: ""
+  
+  virustotal:
+    enabled: false
+    api_key: ""
+  
+  censys:
+    enabled: false
+    api_id: ""
+    api_secret: ""
+  
+  # SIEM integrations
+  splunk:
+    enabled: false
+    host: ""
+    port: 8089
+    token: ""
+  
+  elasticsearch:
+    enabled: false
+    host: "localhost"
+    port: 9200
+    index: "nexus-logs"
+  
+  # Notification integrations
+  slack:
+    enabled: false
+    webhook_url: ""
+    channel: "#security"
+  
+  email:
+    enabled: false
+    smtp_server: ""
+    smtp_port: 587
+    username: ""
+    password: ""
+    recipients: []
+
+# Development and Testing Configuration
+development:
+  # Debug settings
+  debug_mode: false
+  verbose_logging: false
+  
+  # Testing settings
+  test_mode: false
+  mock_tools: false
+  dry_run_default: false
+  
+  # Development tools
+  profiling: false
+  memory_profiling: false
+  
+  # API settings (if API is enabled)
+  api:
+    enabled: false
+    host: "127.0.0.1"
+    port: 8000
+    cors_enabled: true
+    rate_limiting: true

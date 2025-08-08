@@ -1,0 +1,686 @@
+# Comprehensive Kali Linux Tools Configuration
+# This file contains configuration for all major Kali Linux penetration testing tools
+
+# Information Gathering Tools
+information_gathering:
+  nmap:
+    path: "/usr/bin/nmap"
+    category: "network_scanner"
+    description: "Network discovery and security auditing"
+    default_args: ["-sS", "-sV", "-O"]
+    timeout: 600
+    enabled: true
+    
+  masscan:
+    path: "/usr/bin/masscan"
+    category: "network_scanner"
+    description: "High-speed TCP port scanner"
+    default_args: ["--rate=1000"]
+    timeout: 300
+    enabled: true
+    
+  zmap:
+    path: "/usr/bin/zmap"
+    category: "network_scanner"
+    description: "Fast single packet network scanner"
+    default_args: []
+    timeout: 300
+    enabled: true
+    
+  unicornscan:
+    path: "/usr/bin/unicornscan"
+    category: "network_scanner"
+    description: "Asynchronous network stimulus delivery"
+    default_args: []
+    timeout: 300
+    enabled: true
+    
+  # DNS Tools
+  dnsrecon:
+    path: "/usr/bin/dnsrecon"
+    category: "dns_enumeration"
+    description: "DNS enumeration script"
+    default_args: []
+    timeout: 300
+    enabled: true
+    
+  dnsenum:
+    path: "/usr/bin/dnsenum"
+    category: "dns_enumeration"
+    description: "DNS enumeration tool"
+    default_args: []
+    timeout: 300
+    enabled: true
+    
+  fierce:
+    path: "/usr/bin/fierce"
+    category: "dns_enumeration"
+    description: "DNS reconnaissance tool"
+    default_args: []
+    timeout: 300
+    enabled: true
+    
+  dnsmap:
+    path: "/usr/bin/dnsmap"
+    category: "dns_enumeration"
+    description: "DNS network mapper"
+    default_args: []
+    timeout: 300
+    enabled: true
+    
+  # OSINT Tools
+  theharvester:
+    path: "/usr/bin/theHarvester"
+    category: "osint"
+    description: "E-mail, subdomain and people names harvester"
+    default_args: []
+    timeout: 300
+    enabled: true
+    
+  recon-ng:
+    path: "/usr/bin/recon-ng"
+    category: "osint"
+    description: "Web reconnaissance framework"
+    default_args: []
+    timeout: 600
+    enabled: true
+    
+  maltego:
+    path: "/usr/bin/maltego"
+    category: "osint"
+    description: "Open source intelligence and forensics application"
+    default_args: []
+    timeout: 900
+    enabled: true
+    
+  spiderfoot:
+    path: "/usr/bin/spiderfoot"
+    category: "osint"
+    description: "Automated OSINT collection tool"
+    default_args: []
+    timeout: 600
+    enabled: true
+    
+  # Subdomain Enumeration
+  sublist3r:
+    path: "/usr/bin/sublist3r"
+    category: "subdomain_enum"
+    description: "Fast subdomains enumeration tool"
+    default_args: []
+    timeout: 300
+    enabled: true
+    
+  amass:
+    path: "/usr/bin/amass"
+    category: "subdomain_enum"
+    description: "In-depth attack surface mapping"
+    default_args: ["enum"]
+    timeout: 600
+    enabled: true
+    
+  subfinder:
+    path: "/usr/bin/subfinder"
+    category: "subdomain_enum"
+    description: "Subdomain discovery tool"
+    default_args: []
+    timeout: 300
+    enabled: true
+    
+  assetfinder:
+    path: "/usr/bin/assetfinder"
+    category: "subdomain_enum"
+    description: "Find domains and subdomains"
+    default_args: []
+    timeout: 300
+    enabled: true
+
+# Vulnerability Analysis Tools
+vulnerability_analysis:
+  # Web Vulnerability Scanners
+  nikto:
+    path: "/usr/bin/nikto"
+    category: "web_scanner"
+    description: "Web server scanner"
+    default_args: ["-C", "all"]
+    timeout: 600
+    enabled: true
+    
+  dirb:
+    path: "/usr/bin/dirb"
+    category: "web_scanner"
+    description: "Web content scanner"
+    default_args: []
+    timeout: 300
+    enabled: true
+    
+  gobuster:
+    path: "/usr/bin/gobuster"
+    category: "web_scanner"
+    description: "Directory/file & DNS busting tool"
+    default_args: ["dir"]
+    timeout: 300
+    enabled: true
+    
+  dirbuster:
+    path: "/usr/bin/dirbuster"
+    category: "web_scanner"
+    description: "Multi threaded java application for brute forcing directories"
+    default_args: []
+    timeout: 600
+    enabled: true
+    
+  wfuzz:
+    path: "/usr/bin/wfuzz"
+    category: "web_scanner"
+    description: "Web application fuzzer"
+    default_args: []
+    timeout: 600
+    enabled: true
+    
+  ffuf:
+    path: "/usr/bin/ffuf"
+    category: "web_scanner"
+    description: "Fast web fuzzer"
+    default_args: []
+    timeout: 300
+    enabled: true
+    
+  # Web Application Analysis
+  whatweb:
+    path: "/usr/bin/whatweb"
+    category: "web_analysis"
+    description: "Web technology identifier"
+    default_args: []
+    timeout: 120
+    enabled: true
+    
+  wafw00f:
+    path: "/usr/bin/wafw00f"
+    category: "web_analysis"
+    description: "Web Application Firewall fingerprinting tool"
+    default_args: []
+    timeout: 60
+    enabled: true
+    
+  wapiti:
+    path: "/usr/bin/wapiti"
+    category: "web_scanner"
+    description: "Web application vulnerability scanner"
+    default_args: []
+    timeout: 900
+    enabled: true
+    
+  # SSL/TLS Analysis
+  sslscan:
+    path: "/usr/bin/sslscan"
+    category: "ssl_analysis"
+    description: "SSL/TLS scanner"
+    default_args: []
+    timeout: 120
+    enabled: true
+    
+  sslyze:
+    path: "/usr/bin/sslyze"
+    category: "ssl_analysis"
+    description: "SSL configuration scanner"
+    default_args: []
+    timeout: 120
+    enabled: true
+    
+  testssl:
+    path: "/usr/bin/testssl.sh"
+    category: "ssl_analysis"
+    description: "Testing TLS/SSL encryption"
+    default_args: []
+    timeout: 300
+    enabled: true
+    
+  # Network Vulnerability Scanners
+  openvas:
+    path: "/usr/bin/openvas"
+    category: "vuln_scanner"
+    description: "Open source vulnerability scanner"
+    default_args: []
+    timeout: 3600
+    enabled: true
+    
+  nessus:
+    path: "/opt/nessus/bin/nessus"
+    category: "vuln_scanner"
+    description: "Comprehensive vulnerability scanner"
+    default_args: []
+    timeout: 3600
+    enabled: false  # Commercial tool
+    
+  # Database Scanners
+  sqlmap:
+    path: "/usr/bin/sqlmap"
+    category: "database_scanner"
+    description: "Automatic SQL injection tool"
+    default_args: ["--batch", "--no-cast"]
+    timeout: 1800
+    enabled: true
+
+# Web Application Analysis Tools
+web_applications:
+  # Proxy Tools
+  burpsuite:
+    path: "/usr/bin/burpsuite"
+    category: "web_proxy"
+    description: "Web application security testing platform"
+    default_args: []
+    timeout: 3600
+    enabled: true
+    
+  owasp-zap:
+    path: "/usr/bin/zaproxy"
+    category: "web_proxy"
+    description: "OWASP Zed Attack Proxy"
+    default_args: []
+    timeout: 3600
+    enabled: true
+    
+  # CMS Scanners
+  wpscan:
+    path: "/usr/bin/wpscan"
+    category: "cms_scanner"
+    description: "WordPress security scanner"
+    default_args: []
+    timeout: 600
+    enabled: true
+    
+  joomscan:
+    path: "/usr/bin/joomscan"
+    category: "cms_scanner"
+    description: "Joomla vulnerability scanner"
+    default_args: []
+    timeout: 600
+    enabled: true
+    
+  droopescan:
+    path: "/usr/bin/droopescan"
+    category: "cms_scanner"
+    description: "Drupal & SilverStripe scanner"
+    default_args: []
+    timeout: 600
+    enabled: true
+    
+  # Specialized Web Tools
+  commix:
+    path: "/usr/bin/commix"
+    category: "web_exploit"
+    description: "Command injection exploiter"
+    default_args: []
+    timeout: 900
+    enabled: true
+    
+  xsser:
+    path: "/usr/bin/xsser"
+    category: "web_exploit"
+    description: "Cross Site Scripter"
+    default_args: []
+    timeout: 600
+    enabled: true
+
+# Database Assessment Tools
+database_assessment:
+  # MySQL Tools
+  mysql:
+    path: "/usr/bin/mysql"
+    category: "database_client"
+    description: "MySQL client"
+    default_args: []
+    timeout: 300
+    enabled: true
+    
+  # PostgreSQL Tools
+  psql:
+    path: "/usr/bin/psql"
+    category: "database_client"
+    description: "PostgreSQL client"
+    default_args: []
+    timeout: 300
+    enabled: true
+    
+  # MSSQL Tools
+  sqsh:
+    path: "/usr/bin/sqsh"
+    category: "database_client"
+    description: "SQL shell for MS SQL Server"
+    default_args: []
+    timeout: 300
+    enabled: true
+    
+  # Oracle Tools
+  oscanner:
+    path: "/usr/bin/oscanner"
+    category: "database_scanner"
+    description: "Oracle assessment framework"
+    default_args: []
+    timeout: 600
+    enabled: true
+
+# Password Attacks Tools
+password_attacks:
+  # Password Crackers
+  john:
+    path: "/usr/bin/john"
+    category: "password_cracker"
+    description: "John the Ripper password cracker"
+    default_args: []
+    timeout: 3600
+    enabled: true
+    
+  hashcat:
+    path: "/usr/bin/hashcat"
+    category: "password_cracker"
+    description: "Advanced password recovery"
+    default_args: []
+    timeout: 3600
+    enabled: true
+    
+  hydra:
+    path: "/usr/bin/hydra"
+    category: "password_cracker"
+    description: "Network logon cracker"
+    default_args: []
+    timeout: 1800
+    enabled: true
+    
+  medusa:
+    path: "/usr/bin/medusa"
+    category: "password_cracker"
+    description: "Speedy, parallel, modular login brute-forcer"
+    default_args: []
+    timeout: 1800
+    enabled: true
+    
+  ncrack:
+    path: "/usr/bin/ncrack"
+    category: "password_cracker"
+    description: "High-speed network authentication cracker"
+    default_args: []
+    timeout: 1800
+    enabled: true
+    
+  # Password Generation
+  crunch:
+    path: "/usr/bin/crunch"
+    category: "password_generator"
+    description: "Wordlist generator"
+    default_args: []
+    timeout: 600
+    enabled: true
+    
+  cewl:
+    path: "/usr/bin/cewl"
+    category: "password_generator"
+    description: "Custom word list generator"
+    default_args: []
+    timeout: 300
+    enabled: true
+
+# Wireless Attacks Tools
+wireless_attacks:
+  # WiFi Tools
+  aircrack-ng:
+    path: "/usr/bin/aircrack-ng"
+    category: "wifi_cracker"
+    description: "WiFi security auditing tools suite"
+    default_args: []
+    timeout: 3600
+    enabled: true
+    
+  airodump-ng:
+    path: "/usr/bin/airodump-ng"
+    category: "wifi_scanner"
+    description: "WiFi packet capture"
+    default_args: []
+    timeout: 3600
+    enabled: true
+    
+  aireplay-ng:
+    path: "/usr/bin/aireplay-ng"
+    category: "wifi_attack"
+    description: "WiFi packet injection"
+    default_args: []
+    timeout: 3600
+    enabled: true
+    
+  airmon-ng:
+    path: "/usr/bin/airmon-ng"
+    category: "wifi_monitor"
+    description: "WiFi monitor mode enabler"
+    default_args: []
+    timeout: 60
+    enabled: true
+    
+  # Bluetooth Tools
+  bluez:
+    path: "/usr/bin/bluetoothctl"
+    category: "bluetooth"
+    description: "Bluetooth control utility"
+    default_args: []
+    timeout: 300
+    enabled: true
+    
+  redfang:
+    path: "/usr/bin/redfang"
+    category: "bluetooth"
+    description: "Bluetooth device discovery"
+    default_args: []
+    timeout: 300
+    enabled: true
+
+# Exploitation Tools
+exploitation_tools:
+  # Frameworks
+  metasploit:
+    path: "/usr/bin/msfconsole"
+    category: "exploit_framework"
+    description: "Metasploit Framework"
+    default_args: []
+    timeout: 3600
+    enabled: true
+    
+  # Payload Generators
+  msfvenom:
+    path: "/usr/bin/msfvenom"
+    category: "payload_generator"
+    description: "Metasploit payload generator"
+    default_args: []
+    timeout: 300
+    enabled: true
+    
+  # Social Engineering
+  setoolkit:
+    path: "/usr/bin/setoolkit"
+    category: "social_engineering"
+    description: "Social Engineer Toolkit"
+    default_args: []
+    timeout: 1800
+    enabled: true
+    
+  # Exploit Development
+  searchsploit:
+    path: "/usr/bin/searchsploit"
+    category: "exploit_search"
+    description: "Exploit database search"
+    default_args: []
+    timeout: 60
+    enabled: true
+
+# Sniffing & Spoofing Tools
+sniffing_spoofing:
+  # Network Sniffers
+  wireshark:
+    path: "/usr/bin/wireshark"
+    category: "network_sniffer"
+    description: "Network protocol analyzer"
+    default_args: []
+    timeout: 3600
+    enabled: true
+    
+  tcpdump:
+    path: "/usr/bin/tcpdump"
+    category: "network_sniffer"
+    description: "Command-line packet analyzer"
+    default_args: []
+    timeout: 3600
+    enabled: true
+    
+  tshark:
+    path: "/usr/bin/tshark"
+    category: "network_sniffer"
+    description: "Terminal-based Wireshark"
+    default_args: []
+    timeout: 3600
+    enabled: true
+    
+  # Network Spoofing
+  ettercap:
+    path: "/usr/bin/ettercap"
+    category: "network_spoof"
+    description: "Comprehensive network tool"
+    default_args: []
+    timeout: 1800
+    enabled: true
+    
+  bettercap:
+    path: "/usr/bin/bettercap"
+    category: "network_spoof"
+    description: "Network attack and monitoring framework"
+    default_args: []
+    timeout: 1800
+    enabled: true
+    
+  # ARP Tools
+  arpspoof:
+    path: "/usr/bin/arpspoof"
+    category: "arp_spoof"
+    description: "ARP spoofing tool"
+    default_args: []
+    timeout: 1800
+    enabled: true
+
+# Post Exploitation Tools
+post_exploitation:
+  # Privilege Escalation
+  linpeas:
+    path: "/usr/bin/linpeas.sh"
+    category: "privesc_linux"
+    description: "Linux privilege escalation awesome script"
+    default_args: []
+    timeout: 600
+    enabled: true
+    
+  winpeas:
+    path: "/usr/bin/winPEAS.exe"
+    category: "privesc_windows"
+    description: "Windows privilege escalation awesome script"
+    default_args: []
+    timeout: 600
+    enabled: true
+    
+  # Windows Tools
+  mimikatz:
+    path: "/usr/share/windows-resources/mimikatz/x64/mimikatz.exe"
+    category: "credential_dump"
+    description: "Windows credential extraction"
+    default_args: []
+    timeout: 300
+    enabled: true
+    
+  # Network Tools
+  netcat:
+    path: "/usr/bin/nc"
+    category: "network_utility"
+    description: "Network Swiss Army knife"
+    default_args: []
+    timeout: 3600
+    enabled: true
+    
+  socat:
+    path: "/usr/bin/socat"
+    category: "network_utility"
+    description: "Multipurpose relay"
+    default_args: []
+    timeout: 3600
+    enabled: true
+
+# Forensics Tools
+forensics:
+  # File Analysis
+  binwalk:
+    path: "/usr/bin/binwalk"
+    category: "file_analysis"
+    description: "Firmware analysis tool"
+    default_args: []
+    timeout: 600
+    enabled: true
+    
+  foremost:
+    path: "/usr/bin/foremost"
+    category: "file_recovery"
+    description: "File carving tool"
+    default_args: []
+    timeout: 1800
+    enabled: true
+    
+  # Memory Analysis
+  volatility:
+    path: "/usr/bin/volatility"
+    category: "memory_analysis"
+    description: "Memory forensics framework"
+    default_args: []
+    timeout: 1800
+    enabled: true
+    
+  # Network Forensics
+  networkminer:
+    path: "/usr/bin/networkminer"
+    category: "network_forensics"
+    description: "Network forensic analysis tool"
+    default_args: []
+    timeout: 1800
+    enabled: true
+
+# Reporting Tools
+reporting_tools:
+  # Report Generators
+  dradis:
+    path: "/usr/bin/dradis"
+    category: "report_generator"
+    description: "Collaboration and reporting platform"
+    default_args: []
+    timeout: 1800
+    enabled: true
+    
+  # Documentation
+  keepnote:
+    path: "/usr/bin/keepnote"
+    category: "documentation"
+    description: "Note taking application"
+    default_args: []
+    timeout: 1800
+    enabled: true
+
+# System Services
+system_services:
+  # Database Services
+  postgresql:
+    path: "/usr/bin/systemctl"
+    category: "database_service"
+    description: "PostgreSQL database service"
+    default_args: ["start", "postgresql"]
+    timeout: 60
+    enabled: true
+    
+  # Web Services
+  apache2:
+    path: "/usr/bin/systemctl"
+    category: "web_service"
+    description: "Apache web server"
+    default_args: ["start", "apache2"]
+    timeout: 60
+    enabled: true

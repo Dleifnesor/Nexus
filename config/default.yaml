@@ -1,0 +1,215 @@
+# Nexus Default Configuration File
+# This file contains the default settings for Nexus AI-Powered Penetration Testing Tool
+
+# AI Configuration
+ai:
+  model: "mlabonne/Qwen3-14B-abliterated"
+  ollama_url: "http://localhost:11434"
+  temperature: 0.7
+  max_tokens: 2048
+  timeout: 300
+  retry_attempts: 3
+  retry_delay: 5
+
+# Tool Configurations
+tools:
+  nmap:
+    path: "/usr/bin/nmap"
+    default_args: ["-sS", "-sV", "-O"]
+    timeout: 600
+    enabled: true
+    custom_params: {}
+  
+  metasploit:
+    path: "/usr/share/metasploit-framework"
+    default_args: []
+    timeout: 900
+    enabled: true
+    custom_params:
+      msfconsole: "/usr/bin/msfconsole"
+      database: "postgresql://nexus:password@localhost/msf"
+  
+  sqlmap:
+    path: "/usr/bin/sqlmap"
+    default_args: ["--batch", "--no-cast"]
+    timeout: 1800
+    enabled: true
+    custom_params:
+      risk: 1
+      level: 1
+  
+  gobuster:
+    path: "/usr/bin/gobuster"
+    default_args: ["dir"]
+    timeout: 300
+    enabled: true
+    custom_params:
+      wordlist: "/usr/share/wordlists/dirb/common.txt"
+      threads: 10
+  
+  nikto:
+    path: "/usr/bin/nikto"
+    default_args: ["-C", "all"]
+    timeout: 600
+    enabled: true
+    custom_params: {}
+  
+  hydra:
+    path: "/usr/bin/hydra"
+    default_args: []
+    timeout: 900
+    enabled: true
+    custom_params:
+      threads: 4
+  
+  john:
+    path: "/usr/bin/john"
+    default_args: []
+    timeout: 1800
+    enabled: true
+    custom_params:
+      wordlist: "/usr/share/wordlists/rockyou.txt"
+  
+  dirb:
+    path: "/usr/bin/dirb"
+    default_args: []
+    timeout: 300
+    enabled: true
+    custom_params:
+      wordlist: "/usr/share/wordlists/dirb/common.txt"
+  
+  masscan:
+    path: "/usr/bin/masscan"
+    default_args: []
+    timeout: 300
+    enabled: true
+    custom_params:
+      rate: 1000
+  
+  amass:
+    path: "/usr/bin/amass"
+    default_args: ["enum"]
+    timeout: 600
+    enabled: true
+    custom_params: {}
+  
+  theharvester:
+    path: "/usr/bin/theHarvester"
+    default_args: []
+    timeout: 300
+    enabled: true
+    custom_params:
+      limit: 500
+  
+  sublist3r:
+    path: "/usr/bin/sublist3r"
+    default_args: []
+    timeout: 300
+    enabled: true
+    custom_params: {}
+  
+  whatweb:
+    path: "/usr/bin/whatweb"
+    default_args: []
+    timeout: 120
+    enabled: true
+    custom_params: {}
+  
+  wafw00f:
+    path: "/usr/bin/wafw00f"
+    default_args: []
+    timeout: 60
+    enabled: true
+    custom_params: {}
+  
+  sslscan:
+    path: "/usr/bin/sslscan"
+    default_args: []
+    timeout: 120
+    enabled: true
+    custom_params: {}
+
+# Safety and Security Configuration
+safety:
+  scope_validation: true
+  rate_limiting: true
+  max_concurrent_scans: 5
+  confirmation_required: false
+  emergency_contacts: []
+  max_requests_per_minute: 60
+  dangerous_command_blocking: true
+  stealth_mode: false
+  detection_evasion: true
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  file: "~/.nexus/logs/nexus.log"
+  format: "json"
+  max_size: "100MB"
+  backup_count: 5
+  console_output: true
+  structured_logging: true
+
+# Reporting Configuration
+reporting:
+  output_dir: "~/.nexus/reports"
+  formats: ["html", "json", "pdf"]
+  template_dir: "~/.nexus/templates"
+  auto_generate: true
+  include_screenshots: true
+  include_raw_output: true
+  executive_summary: true
+
+# Database Configuration
+database:
+  path: "~/.nexus/data/nexus.db"
+  backup_interval: 3600  # 1 hour in seconds
+  max_backups: 10
+  encryption_enabled: true
+  connection_pool_size: 5
+
+# Plugin Configuration
+plugins:
+  directory: "~/.nexus/plugins"
+  auto_load: true
+  enabled_plugins: []
+  disabled_plugins: []
+
+# Campaign Configuration
+campaigns:
+  default_template: "default_campaign.yaml"
+  auto_save_interval: 300  # 5 minutes
+  max_concurrent_campaigns: 3
+  evidence_retention_days: 90
+
+# Network Configuration
+network:
+  user_agent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+  timeout: 30
+  retries: 3
+  proxy: null
+  verify_ssl: true
+
+# Performance Configuration
+performance:
+  max_memory_usage: "4GB"
+  max_cpu_usage: 80  # percentage
+  thread_pool_size: 10
+  async_operations: true
+  cache_enabled: true
+  cache_ttl: 3600  # 1 hour
+
+# Update Configuration
+updates:
+  auto_check: true
+  check_interval: 86400  # 24 hours
+  auto_update: false
+  update_channel: "stable"
+
+# Custom Settings
+custom:
+  organization: ""
+  contact_email: ""
+  license_key: ""
+  environment: "production"
