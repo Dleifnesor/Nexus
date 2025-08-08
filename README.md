@@ -19,19 +19,8 @@ Unlike traditional tools that simply execute commands, **Nexus thinks, adapts, a
 - **Military-Grade Evasion**: 95% stealth rating with adaptive detection avoidance
 - **Enterprise Safety**: Zero-trust security model with comprehensive audit trails
 
-## Quick Installation
 
-### One-Command Install (Recommended)
-```bash
-# Download and run the automated installer
-curl -fsSL https://raw.githubusercontent.com/nexus-security/nexus/main/scripts/install.sh | bash
-
-# Verify installation
-nexus --version
-nexus health
-```
-
-### Manual Installation
+### Installation
 
 #### Prerequisites
 - **OS**: Kali Linux (recommended) or Ubuntu/Debian 20.04+
@@ -63,7 +52,7 @@ ollama pull mlabonne/Qwen3-14B-abliterated
 
 4. **Install Nexus**
 ```bash
-git clone https://github.com/nexus-security/nexus.git
+git clone https://github.com/Dleifnesor/nexus.git
 cd nexus
 pip install -e .
 ```
@@ -577,3 +566,4 @@ Nexus is designed for authorized penetration testing and security research only.
 
 
 *Nexus: Where artificial intelligence meets cybersecurity excellence*
+
