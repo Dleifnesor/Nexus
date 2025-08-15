@@ -555,7 +555,7 @@ download_ai_model() {
     show_progress "Downloading AI Model"
     
     # Check if model is already available
-    if ollama list 2>/dev/null | grep -q "qwen3-14b-abliterated"; then
+    if ollama list 2>/dev/null | grep -q "qwen3-coder-abliterated"; then
         log_info "AI model is already downloaded"
         return
     fi
@@ -569,7 +569,7 @@ download_ai_model() {
     while [ $retry_count -lt $max_retries ]; do
         log_info "Downloading AI model (attempt $((retry_count + 1))/$max_retries)..."
         
-        if ollama pull mlabonne/Qwen3-14B-abliterated; then
+        if ollama pull huihui_ai/qwen3-coder-abliterated; then
             break
         else
             retry_count=$((retry_count + 1))
@@ -581,11 +581,11 @@ download_ai_model() {
     done
     
     # Verify model download
-    if ollama list 2>/dev/null | grep -q "qwen3-14b-abliterated"; then
+    if ollama list 2>/dev/null | grep -q "qwen3-coder-abliterated"; then
         log_success "AI model downloaded successfully"
     else
         log_warning "AI model download failed after $max_retries attempts"
-        log_info "You can manually download it later with: ollama pull mlabonne/Qwen3-14B-abliterated"
+        log_info "You can manually download it later with: ollama pull huihui_ai/qwen3-coder-abliterated"
         # Don't exit - continue with installation
     fi
 }
@@ -727,11 +727,26 @@ create_cli_wrapper() {
 NEXUS_DIR="$nexus_absolute_dir"
 VENV_DIR="\$NEXUS_DIR/venv"
 
-# Check if virtual environment exists
+# Check if virtual environment exists, if not try to find it
 if [[ ! -d "\$VENV_DIR" ]]; then
-    echo "Error: Nexus virtual environment not found at \$VENV_DIR"
-    echo "Please run the installation script again."
-    exit 1
+    # Try alternative locations
+    if [[ -d "\$NEXUS_DIR/../venv" ]]; then
+        VENV_DIR="\$NEXUS_DIR/../venv"
+        NEXUS_DIR="\$(dirname "\$NEXUS_DIR")"
+    elif [[ -d "/opt/pentest-tools/BloodHound.py/venv" ]]; then
+        # Fallback to system Python if virtual environment not found
+        echo "Warning: Nexus virtual environment not found, using system Python"
+        cd "\$NEXUS_DIR" || exit 1
+        export PYTHONPATH="\$NEXUS_DIR:\$PYTHONPATH"
+        python3 -m nexus.cli.main "\$@"
+        exit \$?
+    else
+        echo "Error: Nexus virtual environment not found at \$VENV_DIR"
+        echo "Tried alternative locations but none found."
+        echo "Please run the installation script again or create the virtual environment manually:"
+        echo "  cd \$NEXUS_DIR && python3 -m venv venv && source venv/bin/activate && pip install -e ."
+        exit 1
+    fi
 fi
 
 # Change to Nexus directory
