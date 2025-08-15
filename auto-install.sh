@@ -716,12 +716,15 @@ create_cli_wrapper() {
     local wrapper_script="/usr/local/bin/nexus"
     local nexus_dir="$(pwd)"
     
+    # Get the absolute path to the current Nexus directory
+    local nexus_absolute_dir="$(realpath "$nexus_dir")"
+    
     sudo tee "$wrapper_script" > /dev/null << EOF
 #!/bin/bash
 # Nexus CLI Wrapper Script
 # Automatically activates the virtual environment and runs Nexus
 
-NEXUS_DIR="$nexus_dir"
+NEXUS_DIR="$nexus_absolute_dir"
 VENV_DIR="\$NEXUS_DIR/venv"
 
 # Check if virtual environment exists
