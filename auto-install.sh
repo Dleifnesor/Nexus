@@ -820,47 +820,8 @@ run_health_check() {
     log_info "Core tools available: $working_tools/${#test_tools[@]}"
     
     # Test Python imports
-    local python_imports=("requests" "yaml" "click" "asyncio")
-    local working_imports=0
-    
-    for import in "${python_imports[@]}"; do
-        if python3 -c "import
-# Run system health check
-run_health_check() {
-    show_progress "Running Health Check"
-    
-    # Test Nexus CLI
-    if nexus --version &> /dev/null; then
-        log_success "Nexus CLI is working"
-    else
-        log_warning "Nexus CLI test failed - may need manual configuration"
-    fi
-    
-    # Test Ollama connection
-    local ollama_status
-    if ollama_status=$(nexus health 2>&1) && echo "$ollama_status" | grep -q "Ollama: Connected"; then
-        log_success "Ollama connection is working"
-    else
-        log_warning "Ollama connection test failed - may need manual configuration"
-        log_info "Try: sudo systemctl restart ollama"
-    fi
-    
-    # Test core penetration testing tools
-    local test_tools=("nmap" "gobuster" "nikto" "sqlmap" "hydra")
-    local working_tools=0
-    
-    for tool in "${test_tools[@]}"; do
-        if command -v "$tool" &> /dev/null; then
-            log_success "$tool is available"
-            working_tools=$((working_tools + 1))
-        else
-            log_warning "$tool is not available"
-        fi
-    done
-    
-    log_info "Core tools available: $working_tools/${#test_tools[@]}"
-    
-    # Test Python imports
+    local python_imports=
+# Test Python imports
     local python_imports=("requests" "yaml" "click" "asyncio")
     local working_imports=0
     
