@@ -55,7 +55,7 @@ NC='\033[0m' # No Color
 
 # Configuration
 NEXUS_VERSION="1.0.0"
-OLLAMA_MODEL="mlabonne/Qwen3-14B-abliterated"
+OLLAMA_MODEL="huihui_ai/qwen2.5-coder-abliterate:14b"
 NEXUS_HOME="$HOME/.nexus"
 NEXUS_CONFIG_DIR="$NEXUS_HOME/config"
 NEXUS_LOG_DIR="$NEXUS_HOME/logs"
@@ -646,7 +646,7 @@ remove_model() {
 test_model() {
     local model="$1"
     if [[ -z "$model" ]]; then
-        model="mlabonne/Qwen3-14B-abliterated"
+        model="huihui_ai/qwen2.5-coder-abliterate:14b"
     fi
     
     log "Testing model: $model"
@@ -661,12 +661,12 @@ usage() {
     echo "  install MODEL    Install/pull a specific model"
     echo "  remove MODEL     Remove a specific model"
     echo "  list            List installed models"
-    echo "  test [MODEL]    Test a model (default: mlabonne/Qwen3-14B-abliterated)"
+    echo "  test [MODEL]    Test a model (default: huihui_ai/qwen2.5-coder-abliterate:14b)"
     echo "  status          Check Ollama service status"
     echo "  restart         Restart Ollama service"
     echo
     echo "Examples:"
-    echo "  $0 install mlabonne/Qwen3-14B-abliterated"
+    echo "  $0 install huihui_ai/qwen2.5-coder-abliterate:14b"
     echo "  $0 test"
     echo "  $0 list"
 }
@@ -864,7 +864,7 @@ update_nexus() {
 }
 
 update_model() {
-    local model="${1:-mlabonne/Qwen3-14B-abliterated}"
+    local model="${1:-huihui_ai/qwen2.5-coder-abliterate:14b}"
     
     log "Updating AI model: $model"
     ollama pull "$model"

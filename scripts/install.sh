@@ -6,8 +6,7 @@
 # This script installs Nexus and all its dependencies on Kali Linux
 # including Ollama, the AI model, and all required penetration testing tools.
 
-# Don't exit on errors - we'll handle them gracefully
-set +e
+set -e  # Exit on any error
 
 # Colors for output
 RED='\033[0;31m'
@@ -42,50 +41,6 @@ check_root() {
     fi
 }
 
-# Comprehensive error recovery function
-recover_from_errors() {
-    log_info "Running comprehensive error recovery..."
-    
-    # Fix broken packages
-    sudo apt --fix-broken install -y 2>/dev/null || true
-    sudo dpkg --configure -a 2>/dev/null || true
-    
-    # Clean package cache
-    sudo apt clean 2>/dev/null || true
-    sudo apt autoclean 2>/dev/null || true
-    
-    # Update package lists
-    sudo apt update 2>/dev/null || true
-    
-    log_info "Error recovery completed"
-}
-
-# Enhanced error handling wrapper
-safe_execute() {
-    local command="$1"
-    local description="$2"
-    local max_retries="${3:-3}"
-    local retry_count=0
-    
-    while [ $retry_count -lt $max_retries ]; do
-        log_info "$description (attempt $((retry_count + 1))/$max_retries)"
-        
-        if eval "$command"; then
-            return 0
-        else
-            retry_count=$((retry_count + 1))
-            if [ $retry_count -lt $max_retries ]; then
-                log_warning "Command failed, running error recovery..."
-                recover_from_errors
-                sleep 5
-            fi
-        fi
-    done
-    
-    log_warning "$description failed after $max_retries attempts, continuing..."
-    return 1
-}
-
 # Check if running on Kali Linux
 check_kali() {
     if ! grep -q "Kali" /etc/os-release 2>/dev/null; then
@@ -101,114 +56,14 @@ check_kali() {
     fi
 }
 
-# Update system packages with comprehensive error handling
+# Update system packages
 update_system() {
     log_info "Updating system packages..."
-    
-    # Update package lists with retry logic
-    safe_execute "sudo apt update" "Updating package lists"
-    
-    # Handle any existing broken packages before upgrade
-    recover_from_errors
-    
-    # Handle mitmproxy issue before system upgrade
-    handle_mitmproxy_issue
-    
-    # Perform system upgrade with error handling
-    log_info "Upgrading system packages (this may take a while)..."
-    if ! sudo apt upgrade -y --fix-broken; then
-        log_warning "System upgrade encountered issues, attempting recovery..."
-        recover_from_errors
-        
-        # Try upgrade again after recovery
-        sudo apt upgrade -y --fix-broken || log_warning "Some packages may not have upgraded successfully"
-    fi
-    
-    # Final cleanup and verification
-    recover_from_errors
-    
+    sudo apt update && sudo apt upgrade -y
     log_success "System packages updated"
 }
 
-# Enhanced mitmproxy Python version compatibility handler
-handle_mitmproxy_issue() {
-    log_info "Checking for mitmproxy Python compatibility issues..."
-    
-    # Get Python version
-    local python_version=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null || echo "3.11")
-    log_info "Current Python version: $python_version"
-    
-    # Check if mitmproxy is in a broken state or incompatible
-    local mitmproxy_broken=false
-    
-    if dpkg -l 2>/dev/null | grep -q "^iU.*mitmproxy" ||
-       dpkg -l 2>/dev/null | grep -q "^iF.*mitmproxy" ||
-       ! dpkg --configure -a 2>/dev/null; then
-        mitmproxy_broken=true
-    fi
-    
-    # Also check if mitmproxy import fails due to syntax error
-    if python3 -c "import mitmproxy" 2>&1 | grep -q "SyntaxError"; then
-        mitmproxy_broken=true
-    fi
-    
-    if [[ "$mitmproxy_broken" == "true" ]] || [[ "$python_version" < "3.12" ]]; then
-        log_warning "Detected mitmproxy Python compatibility issue"
-        
-        # Comprehensive mitmproxy cleanup and fix
-        log_info "Performing comprehensive mitmproxy fix..."
-        
-        # Remove all traces of broken mitmproxy
-        sudo dpkg --remove --force-remove-reinstreq mitmproxy 2>/dev/null || true
-        sudo dpkg --remove --force-depends mitmproxy 2>/dev/null || true
-        sudo dpkg --purge mitmproxy 2>/dev/null || true
-        
-        # Clean up related packages that might be broken
-        sudo apt remove --purge python3-mitmproxy* -y 2>/dev/null || true
-        
-        # Mark mitmproxy as held to prevent automatic installation
-        echo "mitmproxy hold" | sudo dpkg --set-selections 2>/dev/null || true
-        
-        # Fix any remaining package issues
-        recover_from_errors
-        
-        # Install compatible mitmproxy via pip
-        if [[ "$python_version" < "3.12" ]]; then
-            log_info "Installing Python 3.11 compatible mitmproxy..."
-            
-            # Try different compatible versions
-            local mitmproxy_versions=("mitmproxy<11.0.0" "mitmproxy<10.0.0" "mitmproxy==9.0.1")
-            
-            for version in "${mitmproxy_versions[@]}"; do
-                log_info "Trying to install $version..."
-                if sudo python3 -m pip install --upgrade pip && sudo python3 -m pip install "$version"; then
-                    log_success "Successfully installed $version"
-                    break
-                else
-                    log_warning "Failed to install $version, trying next..."
-                fi
-            done
-        else
-            log_info "Installing latest mitmproxy for Python $python_version"
-            sudo python3 -m pip install --upgrade pip
-            sudo python3 -m pip install mitmproxy || log_warning "Failed to install latest mitmproxy"
-        fi
-        
-        # Verify installation
-        if python3 -c "import mitmproxy; print('mitmproxy version:', mitmproxy.__version__)" 2>/dev/null; then
-            log_success "Mitmproxy compatibility issue resolved successfully"
-        else
-            log_warning "Mitmproxy installation verification failed, but system should continue working"
-        fi
-        
-        # Final cleanup
-        recover_from_errors
-    else
-        log_info "No mitmproxy compatibility issues detected"
-    fi
-}
-
-# Install system dependencies with enhanced error handling
+# Install system dependencies
 install_system_deps() {
     log_info "Installing system dependencies..."
     
@@ -236,32 +91,16 @@ install_system_deps() {
         "dos2unix"
     )
     
-    local failed_packages=()
-    
     for package in "${packages[@]}"; do
-        if ! dpkg -l 2>/dev/null | grep -q "^ii  $package "; then
+        if ! dpkg -l | grep -q "^ii  $package "; then
             log_info "Installing $package..."
-            
-            if ! safe_execute "sudo apt install -y $package --fix-broken" "Installing $package"; then
-                failed_packages+=("$package")
-                log_warning "Failed to install $package, will retry later"
-            fi
+            sudo apt install -y "$package"
         else
             log_info "$package is already installed"
         fi
     done
     
-    # Retry failed packages
-    if [ ${#failed_packages[@]} -gt 0 ]; then
-        log_info "Retrying failed packages: ${failed_packages[*]}"
-        recover_from_errors
-        
-        for package in "${failed_packages[@]}"; do
-            safe_execute "sudo apt install -y $package --fix-broken" "Retrying $package installation"
-        done
-    fi
-    
-    log_success "System dependencies installation completed"
+    log_success "System dependencies installed"
 }
 
 # Install penetration testing tools
@@ -303,15 +142,7 @@ install_pentest_tools() {
     for tool in "${kali_tools[@]}"; do
         if ! command -v "$tool" &> /dev/null && ! dpkg -l | grep -q "^ii  $tool "; then
             log_info "Installing $tool..."
-            # Use --fix-broken to handle dependency issues
-            sudo apt install -y "$tool" --fix-broken || log_warning "Failed to install $tool - may not be available in repositories"
-            
-            # Check for and fix any broken packages after each installation
-            if ! dpkg --configure -a 2>/dev/null; then
-                log_warning "Fixing broken packages after installing $tool..."
-                sudo apt --fix-broken install -y || true
-                handle_mitmproxy_issue
-            fi
+            sudo apt install -y "$tool" || log_warning "Failed to install $tool - may not be available in repositories"
         else
             log_info "$tool is already available"
         fi
@@ -427,23 +258,13 @@ install_python_security_tools() {
         "typer"
     )
     
-    # Install mitmproxy with version compatibility
-    local python_version=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
-    if [[ "$python_version" < "3.12" ]]; then
-        log_info "Installing compatible mitmproxy version for Python $python_version"
-        sudo python3 -m pip install "mitmproxy<11.0.0" || log_warning "Failed to install compatible mitmproxy"
-    else
-        log_info "Installing latest mitmproxy for Python $python_version"
-        sudo python3 -m pip install "mitmproxy" || log_warning "Failed to install mitmproxy"
-    fi
-    
     for tool in "${python_tools[@]}"; do
         log_info "Installing Python package: $tool"
         sudo python3 -m pip install "$tool" || log_warning "Failed to install $tool"
     done
 }
 
-# Install Ollama with enhanced error handling
+# Install Ollama
 install_ollama() {
     log_info "Installing Ollama..."
     
@@ -452,16 +273,12 @@ install_ollama() {
         return
     fi
     
-    # Download and install Ollama with retry logic
-    if ! safe_execute "curl -fsSL https://ollama.ai/install.sh | sh" "Downloading and installing Ollama"; then
-        log_error "Failed to install Ollama after multiple attempts"
-        log_info "You can manually install Ollama later with: curl -fsSL https://ollama.ai/install.sh | sh"
-        return 1
-    fi
+    # Download and install Ollama
+    curl -fsSL https://ollama.ai/install.sh | sh
     
     # Create ollama user and group if they don't exist
     if ! id "ollama" &>/dev/null; then
-        sudo useradd -r -s /bin/false -d /usr/share/ollama -m ollama || log_warning "Failed to create ollama user"
+        sudo useradd -r -s /bin/false -d /usr/share/ollama -m ollama
     fi
     
     # Create systemd service file
@@ -483,36 +300,21 @@ Environment="OLLAMA_HOST=0.0.0.0"
 WantedBy=default.target
 EOF
     
-    # Start Ollama service with error handling
-    sudo systemctl daemon-reload || log_warning "Failed to reload systemd daemon"
-    sudo systemctl enable ollama || log_warning "Failed to enable ollama service"
+    # Start Ollama service
+    sudo systemctl daemon-reload
+    sudo systemctl enable ollama
+    sudo systemctl start ollama
     
-    if ! sudo systemctl start ollama; then
-        log_warning "Failed to start ollama service, trying alternative approach..."
-        # Try starting ollama directly
-        sudo -u ollama /usr/local/bin/ollama serve &
-        sleep 5
-    fi
-    
-    # Wait for Ollama to start with timeout
+    # Wait for Ollama to start
     log_info "Waiting for Ollama to start..."
-    local timeout=30
-    local count=0
-    
-    while [ $count -lt $timeout ]; do
-        if systemctl is-active --quiet ollama 2>/dev/null || pgrep -f "ollama serve" >/dev/null; then
-            break
-        fi
-        sleep 1
-        count=$((count + 1))
-    done
+    sleep 10
     
     # Verify Ollama installation
-    if command -v ollama &> /dev/null && (systemctl is-active --quiet ollama || pgrep -f "ollama serve" >/dev/null); then
+    if command -v ollama &> /dev/null && systemctl is-active --quiet ollama; then
         log_success "Ollama installed and running successfully"
     else
-        log_warning "Ollama installation may have issues, but continuing with installation"
-        log_info "You can manually start Ollama later with: sudo systemctl start ollama"
+        log_error "Ollama installation failed"
+        exit 1
     fi
 }
 
@@ -533,7 +335,7 @@ download_ai_model() {
     while [ $retry_count -lt $max_retries ]; do
         log_info "Downloading AI model (attempt $((retry_count + 1))/$max_retries)..."
         
-        if ollama pull mlabonne/Qwen3-14B-abliterated; then
+        if ollama pull huihui_ai/qwen2.5-coder-abliterate:14b; then
             break
         else
             retry_count=$((retry_count + 1))
@@ -549,12 +351,12 @@ download_ai_model() {
         log_success "AI model downloaded successfully"
     else
         log_error "AI model download failed after $max_retries attempts"
-        log_error "You can manually download it later with: ollama pull mlabonne/Qwen3-14B-abliterated"
+        log_error "You can manually download it later with: ollama pull huihui_ai/qwen2.5-coder-abliterate:14b"
         # Don't exit - continue with installation
     fi
 }
 
-# Install Nexus with enhanced error handling
+# Install Nexus
 install_nexus() {
     log_info "Installing Nexus..."
     
@@ -567,59 +369,31 @@ install_nexus() {
     find . -name "*.txt" -type f -exec dos2unix {} \; 2>/dev/null || true
     find . -name "*.md" -type f -exec dos2unix {} \; 2>/dev/null || true
     
-    # Create virtual environment with error handling
+    # Create virtual environment
     if [[ ! -d "venv" ]]; then
-        log_info "Creating Python virtual environment..."
-        if ! python3 -m venv venv; then
-            log_error "Failed to create virtual environment"
-            log_info "Trying alternative approach..."
-            if ! safe_execute "python3 -m venv venv --system-site-packages" "Creating virtual environment with system packages"; then
-                log_error "Virtual environment creation failed"
-                return 1
-            fi
-        fi
+        python3 -m venv venv
     fi
     
     # Activate virtual environment
-    if ! source venv/bin/activate; then
-        log_error "Failed to activate virtual environment"
-        return 1
-    fi
+    source venv/bin/activate
     
-    # Upgrade pip and install wheel with error handling
-    log_info "Upgrading pip and installing build tools..."
-    safe_execute "pip install --upgrade pip wheel setuptools" "Upgrading pip and build tools"
+    # Upgrade pip and install wheel
+    pip install --upgrade pip wheel setuptools
     
     # Install Nexus dependencies first
     if [[ -f "requirements.txt" ]]; then
-        log_info "Installing Nexus dependencies..."
-        if ! safe_execute "pip install -r requirements.txt" "Installing requirements"; then
-            log_warning "Some dependencies may have failed to install"
-            # Try installing dependencies one by one
-            while IFS= read -r requirement; do
-                if [[ ! "$requirement" =~ ^[[:space:]]*# ]] && [[ -n "$requirement" ]]; then
-                    pip install "$requirement" || log_warning "Failed to install: $requirement"
-                fi
-            done < requirements.txt
-        fi
+        pip install -r requirements.txt
     fi
     
     # Install Nexus in development mode
-    log_info "Installing Nexus in development mode..."
-    if ! safe_execute "pip install -e ." "Installing Nexus"; then
-        log_warning "Development installation failed, trying regular installation..."
-        safe_execute "pip install ." "Installing Nexus (regular mode)"
-    fi
+    pip install -e .
     
     # Verify installation
     if python -c "import nexus" 2>/dev/null; then
         log_success "Nexus installed successfully"
-        # Get version if available
-        nexus_version=$(python -c "import nexus; print(getattr(nexus, '__version__', 'unknown'))" 2>/dev/null || echo "unknown")
-        log_info "Nexus version: $nexus_version"
     else
-        log_warning "Nexus installation verification failed"
-        log_info "Installation may still work, continuing..."
+        log_error "Nexus installation failed"
+        exit 1
     fi
     
     deactivate

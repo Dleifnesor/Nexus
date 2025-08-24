@@ -338,7 +338,7 @@ campaign:
 curl -fsSL https://ollama.ai/install.sh | sh
 
 # Pull the required model
-ollama pull mlabonne/Qwen3-14B-abliterated
+ollama pull huihui_ai/qwen2.5-coder-abliterate:14b
 
 # Install Python dependencies
 pip3 install -r requirements.txt

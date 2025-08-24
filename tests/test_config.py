@@ -21,7 +21,7 @@ class TestNexusConfig:
         """Test creating config with defaults"""
         config = NexusConfig()
         
-        assert config.ai.model == "mlabonne/Qwen3-14B-abliterated"
+        assert config.ai.model == "huihui_ai/qwen2.5-coder-abliterate:14b"
         assert config.ai.ollama_url == "http://localhost:11434"
         assert config.ai.temperature == 0.7
         assert config.safety.scope_validation is True
@@ -131,7 +131,7 @@ class TestAIConfig:
         """Test AI config default values"""
         ai_config = AIConfig()
         
-        assert ai_config.model == "mlabonne/Qwen3-14B-abliterated"
+        assert ai_config.model == "huihui_ai/qwen2.5-coder-abliterate:14b"
         assert ai_config.ollama_url == "http://localhost:11434"
         assert ai_config.temperature == 0.7
         assert ai_config.max_tokens == 2048
@@ -270,7 +270,7 @@ class TestConfigFileHandling:
         config = NexusConfig("/non/existent/path.yaml")
         
         # Should have default values
-        assert config.ai.model == "mlabonne/Qwen3-14B-abliterated"
+        assert config.ai.model == "huihui_ai/qwen2.5-coder-abliterate:14b"
         assert config.safety.scope_validation is True
     
     def test_invalid_yaml_config(self):
@@ -286,7 +286,7 @@ class TestConfigFileHandling:
             config = NexusConfig(config_path)
             
             # Should have default values
-            assert config.ai.model == "mlabonne/Qwen3-14B-abliterated"
+            assert config.ai.model == "huihui_ai/qwen2.5-coder-abliterate:14b"
 
 
 if __name__ == "__main__":

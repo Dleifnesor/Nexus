@@ -47,7 +47,7 @@ sudo systemctl start ollama
 
 3. **Download AI Model**
 ```bash
-ollama pull mlabonne/Qwen3-14B-abliterated
+ollama pull huihui_ai/qwen2.5-coder-abliterate:14b
 ```
 
 4. **Install Nexus**
@@ -372,7 +372,7 @@ Create `~/.nexus/config/custom.yaml`:
 ```yaml
 # AI Configuration
 ai:
-  model: "mlabonne/Qwen3-14B-abliterated"
+  model: "huihui_ai/qwen2.5-coder-abliterate:14b"
   temperature: 0.7
   max_tokens: 2048
   

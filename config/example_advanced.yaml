@@ -6,7 +6,7 @@
 ai:
   # Ollama settings
   ollama_url: "http://localhost:11434"
-  model: "mlabonne/Qwen3-14B-abliterated"
+  model: "huihui_ai/qwen2.5-coder-abliterate:14b"
   temperature: 0.7
   max_tokens: 2048
   timeout: 300

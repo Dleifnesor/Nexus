@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class AIConfig:
     """AI configuration settings"""
-    model: str = "mlabonne/Qwen3-14B-abliterated"
+    model: str = "huihui_ai/qwen2.5-coder-abliterate:14b"
     ollama_url: str = "http://localhost:11434"
     temperature: float = 0.7
     max_tokens: int = 2048
