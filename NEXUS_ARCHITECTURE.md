@@ -256,7 +256,7 @@ class PromptTemplate:
 ### Global Configuration (`~/.nexus/config.yaml`)
 ```yaml
 ai:
-  model: "qwen3-14b-abliterated"
+  model: "huihui_ai/qwen2.5-abliterate:14b"
   ollama_url: "http://localhost:11434"
   temperature: 0.7
   max_tokens: 2048

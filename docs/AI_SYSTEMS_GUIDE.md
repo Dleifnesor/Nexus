@@ -327,7 +327,7 @@ Configure AI behavior in `~/.nexus/config/default.yaml`:
 
 ```yaml
 ai:
-  model: "qwen3-14b-abliterated"
+  model: "huihui_ai/qwen2.5-abliterate:14b"
   temperature: 0.7
   max_tokens: 2048
   timeout: 300

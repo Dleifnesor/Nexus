@@ -323,7 +323,7 @@ download_ai_model() {
     log_info "Downloading AI model (this may take a while - up to 8GB download)..."
     
     # Check if model is already available
-    if ollama list | grep -q "qwen3-14b-abliterated"; then
+    if ollama list | grep -q "huihui_ai/qwen2.5-abliterate:14b"; then
         log_info "AI model is already downloaded"
         return
     fi
@@ -347,7 +347,7 @@ download_ai_model() {
     done
     
     # Verify model download
-    if ollama list | grep -q "qwen3-14b-abliterated"; then
+    if ollama list | grep -q "huihui_ai/qwen2.5-abliterate:14b"; then
         log_success "AI model downloaded successfully"
     else
         log_error "AI model download failed after $max_retries attempts"

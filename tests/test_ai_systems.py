@@ -40,7 +40,7 @@ class TestVulnerabilityCorrelator:
         """Mock configuration for testing"""
         config = Mock()
         config.ai = Mock()
-        config.ai.model = "qwen3-14b-abliterated"
+        config.ai.model = "huihui_ai/qwen2.5-abliterate:14b"
         config.ai.temperature = 0.7
         config.ai.max_tokens = 2048
         return config
@@ -231,7 +231,7 @@ class TestExploitRecommender:
         """Mock configuration for testing"""
         config = Mock()
         config.ai = Mock()
-        config.ai.model = "qwen3-14b-abliterated"
+        config.ai.model = "huihui_ai/qwen2.5-abliterate:14b"
         config.ai.temperature = 0.7
         config.ai.max_tokens = 2048
         return config
@@ -381,7 +381,7 @@ class TestAttackPathPlanner:
         """Mock configuration for testing"""
         config = Mock()
         config.ai = Mock()
-        config.ai.model = "qwen3-14b-abliterated"
+        config.ai.model = "huihui_ai/qwen2.5-abliterate:14b"
         config.ai.temperature = 0.7
         config.ai.max_tokens = 2048
         return config
@@ -585,7 +585,7 @@ class TestAISystemsIntegration:
         """Mock configuration for testing"""
         config = Mock()
         config.ai = Mock()
-        config.ai.model = "qwen3-14b-abliterated"
+        config.ai.model = "huihui_ai/qwen2.5-abliterate:14b"
         config.ai.temperature = 0.7
         config.ai.max_tokens = 2048
         return config

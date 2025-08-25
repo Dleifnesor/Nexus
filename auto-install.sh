@@ -555,7 +555,7 @@ download_ai_model() {
     show_progress "Downloading AI Model"
     
     # Check if model is already available
-    if ollama list 2>/dev/null | grep -q "qwen3-coder-abliterated"; then
+    if ollama list 2>/dev/null | grep -q "qwen2.5-coder-abliterate:14b"; then
         log_info "AI model is already downloaded"
         return
     fi
@@ -569,7 +569,7 @@ download_ai_model() {
     while [ $retry_count -lt $max_retries ]; do
         log_info "Downloading AI model (attempt $((retry_count + 1))/$max_retries)..."
         
-        if ollama pull huihui_ai/qwen3-coder-abliterated; then
+        if ollama pull huihui_ai/qwen2.5-coder-abliterate:14b; then
             break
         else
             retry_count=$((retry_count + 1))
@@ -581,11 +581,11 @@ download_ai_model() {
     done
     
     # Verify model download
-    if ollama list 2>/dev/null | grep -q "qwen3-coder-abliterated"; then
+    if ollama list 2>/dev/null | grep -q "qwen2.5-coder-abliterate:14b"; then
         log_success "AI model downloaded successfully"
     else
         log_warning "AI model download failed after $max_retries attempts"
-        log_info "You can manually download it later with: ollama pull huihui_ai/qwen3-coder-abliterated"
+        log_info "You can manually download it later with: ollama pull huihui_ai/qwen2.5-coder-abliterate:14b"
         # Don't exit - continue with installation
     fi
 }
