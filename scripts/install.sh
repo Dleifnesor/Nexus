@@ -160,6 +160,7 @@ install_pentest_tools() {
 # Install tools from GitHub
 install_github_tools() {
     local tools_dir="/opt/pentest-tools"
+    local current_dir=$(pwd)
     
     if [[ ! -d "$tools_dir" ]]; then
         sudo mkdir -p "$tools_dir"
@@ -221,7 +222,8 @@ install_github_tools() {
         echo "export PATH=\$PATH:$tools_dir/AutoRecon" >> ~/.bashrc
     fi
     
-    cd - > /dev/null
+    # Return to the original directory
+    cd "$current_dir"
 }
 
 # Install Python security tools
@@ -359,6 +361,9 @@ download_ai_model() {
 # Install Nexus
 install_nexus() {
     log_info "Installing Nexus..."
+    
+    # Get the current directory (should be the Nexus directory)
+    local nexus_dir=$(pwd)
     
     # Convert line endings for all Python files (in case developed on Windows)
     log_info "Converting line endings to Unix format..."
