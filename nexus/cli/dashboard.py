@@ -32,33 +32,48 @@ def dashboard():
 @click.option('--auto-refresh', '-r', type=int, default=30, help='Auto-refresh interval (seconds)')
 @pass_context
 def dashboard_start(ctx: NexusContext, port: int, host: str, data_dir: Optional[str], auto_refresh: int):
-    """Start the AI analysis dashboard"""
+    """
+    Start the AI analysis dashboard
     
+    Examples:
+    # Start dashboard on default port
+    nexus dashboard start
+    
+    # Start dashboard on specific port
+    nexus dashboard start --port 9090
+    
+    # Start dashboard and monitor data directory
+    nexus dashboard start --data-dir /path/to/scan/results
+    
+    # Start dashboard with custom refresh interval
+    nexus dashboard start --auto-refresh 60
+    """
+     
     ctx.load_config()
-    
+     
     click.echo(f"Starting Nexus AI Dashboard on {host}:{port}")
     click.echo(f"Auto-refresh: {auto_refresh} seconds")
-    
+     
     if data_dir:
         click.echo(f"Monitoring data directory: {data_dir}")
-    
+     
     # Simple text-based dashboard for now
     # In a full implementation, this would start a web server
     try:
         while True:
             # Clear screen (works on most terminals)
             click.clear()
-            
+             
             # Dashboard header
             click.echo("=" * 80)
             click.echo("NEXUS AI PENETRATION TESTING DASHBOARD")
             click.echo(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
             click.echo("=" * 80)
-            
+             
             # System status
             click.echo("\nSYSTEM STATUS")
             click.echo("-" * 40)
-            
+             
             try:
                 ollama_client = ctx.get_ollama_client()
                 if ollama_client.health_check_sync():
@@ -68,29 +83,29 @@ def dashboard_start(ctx: NexusContext, port: int, host: str, data_dir: Optional[
                     click.echo("Ollama: Disconnected")
             except Exception as e:
                 click.echo(f"Ollama: Error - {e}")
-            
+             
             # AI Systems Status
             click.echo("\nAI SYSTEMS STATUS")
             click.echo("-" * 40)
             click.echo("Vulnerability Correlator: Ready")
             click.echo("Exploit Recommender: Ready")
             click.echo("Attack Path Planner: Ready")
-            
+             
             # Data Analysis Summary
             if data_dir and Path(data_dir).exists():
                 click.echo(f"\nDATA ANALYSIS - {data_dir}")
                 click.echo("-" * 40)
-                
+                 
                 # Count files by type
                 data_path = Path(data_dir)
                 vuln_files = list(data_path.glob("*vuln*.json"))
                 exploit_files = list(data_path.glob("*exploit*.json"))
                 path_files = list(data_path.glob("*path*.json"))
-                
+                 
                 click.echo(f"Vulnerability files: {len(vuln_files)}")
                 click.echo(f"Exploit files: {len(exploit_files)}")
                 click.echo(f"Attack path files: {len(path_files)}")
-                
+                 
                 # Show recent activity
                 all_files = list(data_path.glob("*.json"))
                 if all_files:
@@ -104,7 +119,7 @@ def dashboard_start(ctx: NexusContext, port: int, host: str, data_dir: Optional[
                         else:
                             time_str = f"{int(time_ago.total_seconds() // 3600)}h ago"
                         click.echo(f"  {f.name} ({time_str})")
-            
+             
             # Quick Stats (mock data for demonstration)
             click.echo("\nQUICK STATISTICS")
             click.echo("-" * 40)
@@ -113,16 +128,16 @@ def dashboard_start(ctx: NexusContext, port: int, host: str, data_dir: Optional[
             click.echo("Exploits Available: 0")
             click.echo("Attack Paths: 0")
             click.echo("High Risk Issues: 0")
-            
+             
             # Controls
             click.echo("\nCONTROLS")
             click.echo("-" * 40)
             click.echo("Press Ctrl+C to exit dashboard")
             click.echo(f"Next refresh in {auto_refresh} seconds...")
-            
+             
             # Wait for next refresh
             time.sleep(auto_refresh)
-            
+             
     except KeyboardInterrupt:
         click.echo("\n\nDashboard stopped")
 

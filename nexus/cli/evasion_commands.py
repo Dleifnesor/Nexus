@@ -77,14 +77,29 @@ def evasion_profiles(ctx: NexusContext, format: str):
 @click.argument('profile_name')
 @pass_context
 def evasion_set(ctx: NexusContext, profile_name: str):
-    """Set active evasion profile"""
+    """
+    Set active evasion profile
     
+    Examples:
+    # Set maximum stealth profile
+    nexus evasion set stealth_maximum
+    
+    # Set red team profile
+    nexus evasion set red_team
+    
+    # Set balanced stealth profile
+    nexus evasion set stealth_balanced
+    
+    # List available profiles
+    nexus evasion profiles
+    """
+     
     ctx.load_config()
-    
+     
     try:
         ollama_client = ctx.get_ollama_client()
         evasion_manager = EvasionManager(ollama_client, ctx.config)
-        
+         
         if evasion_manager.set_evasion_profile(profile_name):
             profile = evasion_manager.active_profile
             click.echo(f"Activated evasion profile: {profile.name}")
@@ -92,18 +107,18 @@ def evasion_set(ctx: NexusContext, profile_name: str):
             click.echo(f"Detection Risk: {profile.detection_risk.value}")
             click.echo(f"Performance Impact: {profile.performance_impact:.1%}")
             click.echo(f"Active Techniques: {len(profile.techniques)}")
-            
+             
             # Show warning for high-impact profiles
             if profile.performance_impact > 0.6:
                 click.echo("WARNING: High performance impact - operations will be significantly slower")
-            
+             
             # Show complexity warning
             if profile.complexity in ['hard', 'expert']:
                 click.echo(f"WARNING: {profile.complexity.title()} complexity profile - advanced configuration may be required")
         else:
             click.echo(f"ERROR: Unknown evasion profile: {profile_name}")
             click.echo("Use 'nexus evasion profiles' to see available profiles")
-        
+         
     except Exception as e:
         click.echo(f"ERROR: Failed to set evasion profile: {e}", err=True)
 

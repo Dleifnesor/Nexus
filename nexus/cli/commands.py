@@ -25,10 +25,10 @@ def script():
 
 
 @script.command('generate')
-@click.option('--purpose', '-p', type=click.Choice([p.value for p in ScriptPurpose]), 
+@click.option('--purpose', '-p', type=click.Choice([p.value for p in ScriptPurpose]),
               required=True, help='Script purpose')
 @click.option('--target', '-t', help='Target for the script')
-@click.option('--language', '-l', type=click.Choice([l.value for l in ScriptLanguage]), 
+@click.option('--language', '-l', type=click.Choice([l.value for l in ScriptLanguage]),
               help='Script language (auto-detected if not specified)')
 @click.option('--template', help='Use specific template')
 @click.option('--output', '-o', help='Output file path')
@@ -36,23 +36,41 @@ def script():
 @pass_context
 def script_generate(ctx: NexusContext, purpose: str, target: Optional[str], language: Optional[str],
                    template: Optional[str], output: Optional[str], execute: bool):
-    """Generate custom penetration testing scripts using AI"""
+    """
+    Generate custom penetration testing scripts using AI
     
+    Examples:
+    # Generate a port scanner script
+    nexus script generate --purpose network_scanner --target 192.168.1.0/24
+    
+    # Generate a web exploit script with specific language
+    nexus script generate --purpose web_exploit --target example.com --language python
+    
+    # Generate from template
+    nexus script generate --purpose network_scanner --target 192.168.1.100 --template port_scanner
+    
+    # Generate and save to file
+    nexus script generate --purpose credential_attack --target 10.0.0.1 --output my_script.py
+    
+    # Generate and execute immediately
+    nexus script generate --purpose network_scanner --target 192.168.1.0/24 --execute
+    """
+     
     ctx.load_config()
-    
+     
     click.echo(f"Generating {purpose} script...")
-    
+     
     try:
         # Initialize script generator
         ollama_client = ctx.get_ollama_client()
         script_generator = CustomScriptGenerator(ollama_client, ctx.config)
-        
+         
         if template:
             # Generate from template
             variables = {}
             if target:
                 variables['target'] = target
-            
+             
             # Collect additional variables interactively
             click.echo("Enter template variables (press Enter with empty value to finish):")
             while True:
@@ -61,7 +79,7 @@ def script_generate(ctx: NexusContext, purpose: str, target: Optional[str], lang
                     break
                 var_value = click.prompt(f"Value for {var_name}")
                 variables[var_name] = var_value
-            
+             
             generated_script = script_generator.generate_from_template(template, variables)
         else:
             # Generate using AI
@@ -71,7 +89,7 @@ def script_generate(ctx: NexusContext, purpose: str, target: Optional[str], lang
                 'language': language,
                 'user_requirements': click.prompt("Describe specific requirements", default="")
             }
-            
+             
             # Run async generation
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -81,29 +99,29 @@ def script_generate(ctx: NexusContext, purpose: str, target: Optional[str], lang
                 )
             )
             loop.close()
-        
+         
         click.echo(f"Generated script: {generated_script.name}")
         click.echo(f"File: {generated_script.file_path}")
         click.echo(f"🔤 Language: {generated_script.language.value}")
-        
+         
         # Save to custom output path if specified
         if output:
             with open(output, 'w') as f:
                 f.write(generated_script.content)
             click.echo(f"💾 Saved to: {output}")
-        
+         
         # Execute if requested
         if execute:
             if click.confirm("Execute the generated script?"):
                 click.echo("Executing script...")
-                
+                 
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
                 result = loop.run_until_complete(
                     script_generator.execute_script(generated_script.script_id)
                 )
                 loop.close()
-                
+                 
                 if result['success']:
                     click.echo("Script executed successfully")
                     if result['stdout']:
@@ -114,7 +132,7 @@ def script_generate(ctx: NexusContext, purpose: str, target: Optional[str], lang
                     if result['stderr']:
                         click.echo("Error:")
                         click.echo(result['stderr'])
-        
+         
     except Exception as e:
         click.echo(f"ERROR: Script generation failed: {e}", err=True)
 
@@ -372,36 +390,51 @@ def tools_info(ctx: NexusContext, tool_name: str):
 @click.option('--args', '-a', multiple=True, help='Additional arguments')
 @click.option('--timeout', '-t', type=int, help='Execution timeout in seconds')
 @click.option('--output', '-o', help='Save output to file')
-@click.option('--format', type=click.Choice(['raw', 'json']), default='raw', 
+@click.option('--format', type=click.Choice(['raw', 'json']), default='raw',
               help='Output format')
 @pass_context
 def tools_execute(ctx: NexusContext, tool_name: str, target: str, args: tuple, timeout: Optional[int],
                  output: Optional[str], format: str):
-    """Execute a tool against a target"""
+    """
+    Execute a tool against a target
     
+    Examples:
+    # Run nmap scan
+    nexus tools execute nmap 192.168.1.0/24
+    
+    # Run nmap with custom arguments
+    nexus tools execute nmap 192.168.1.100 --args "-p 80,443" --args "-sV"
+    
+    # Run nikto with timeout and save output
+    nexus tools execute nikto example.com --timeout 300 --output scan_results.txt
+    
+    # Run gobuster and get JSON output
+    nexus tools execute gobuster example.com --format json
+    """
+     
     ctx.load_config()
-    
+     
     try:
         tools_manager = KaliToolsManager()
-        
+         
         if tool_name not in tools_manager.get_available_tools():
             click.echo(f"ERROR: Tool not available: {tool_name}")
             return
-        
+         
         click.echo(f"Executing {tool_name} against {target}")
-        
+         
         # Build execution parameters
         kwargs = {}
         if timeout:
             kwargs['timeout'] = timeout
-        
+         
         # Add custom arguments
         for i, arg in enumerate(args):
             kwargs[f'arg_{i}'] = arg
-        
+         
         # Execute tool
         result = tools_manager.execute_tool(tool_name, target, **kwargs)
-        
+         
         # Display results
         if result.status == ToolStatus.SUCCESS:
             click.echo("Tool executed successfully")
@@ -410,10 +443,10 @@ def tools_execute(ctx: NexusContext, tool_name: str, target: str, args: tuple, t
 
         click.echo(f"Execution time: {result.execution_time:.2f} seconds")
         click.echo(f"Command: {result.command}")
-        
+         
         if result.error_message:
             click.echo(f"ERROR: {result.error_message}")
-        
+         
         # Output results
         if format == 'json':
             output_data = {
@@ -425,7 +458,7 @@ def tools_execute(ctx: NexusContext, tool_name: str, target: str, args: tuple, t
                 'parsed_data': result.parsed_data,
                 'error_message': result.error_message
             }
-            
+             
             if output:
                 with open(output, 'w') as f:
                     json.dump(output_data, f, indent=2)
@@ -443,7 +476,7 @@ def tools_execute(ctx: NexusContext, tool_name: str, target: str, args: tuple, t
                 if result.raw_output:
                     click.echo("\n📤 Output:")
                     click.echo(result.raw_output)
-                    
+                     
     except Exception as e:
         click.echo(f"ERROR: Tool execution failed: {e}", err=True)
 

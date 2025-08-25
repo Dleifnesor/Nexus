@@ -463,20 +463,33 @@ install_python_security_tools() {
         "typer"
     )
     
+    # Activate the Nexus virtual environment
+    local venv_dir="$HOME/.nexus/venv"
+    if [[ -d "$venv_dir" ]]; then
+        source "$venv_dir/bin/activate"
+    else
+        log_warning "Virtual environment not found, installing packages globally (may fail due to PEP 668)"
+    fi
+    
     # Install mitmproxy with version compatibility
     local python_version=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
     if [[ "$python_version" < "3.12" ]]; then
         log_info "Installing compatible mitmproxy version for Python $python_version"
-        sudo python3 -m pip install "mitmproxy<11.0.0" || log_warning "Failed to install compatible mitmproxy"
+        python3 -m pip install "mitmproxy<11.0.0" || log_warning "Failed to install compatible mitmproxy"
     else
         log_info "Installing latest mitmproxy for Python $python_version"
-        sudo python3 -m pip install "mitmproxy" || log_warning "Failed to install mitmproxy"
+        python3 -m pip install "mitmproxy" || log_warning "Failed to install mitmproxy"
     fi
     
     for tool in "${python_tools[@]}"; do
         log_info "Installing Python package: $tool"
-        sudo python3 -m pip install "$tool" || log_warning "Failed to install $tool"
+        python3 -m pip install "$tool" || log_warning "Failed to install $tool"
     done
+    
+    # Deactivate virtual environment if it was activated
+    if [[ -d "$venv_dir" ]]; then
+        deactivate
+    fi
 }
 
 # Install Ollama with enhanced error handling
@@ -609,12 +622,13 @@ install_nexus() {
     find . -name "*.md" -type f -exec dos2unix {} \; 2>/dev/null || true
     
     # Create virtual environment with error handling
-    if [[ ! -d "venv" ]]; then
-        log_info "Creating Python virtual environment..."
-        if ! python3 -m venv venv; then
+    local venv_dir="$HOME/.nexus/venv"
+    if [[ ! -d "$venv_dir" ]]; then
+        log_info "Creating Python virtual environment in $venv_dir..."
+        if ! python3 -m venv "$venv_dir"; then
             log_error "Failed to create virtual environment"
             log_info "Trying alternative approach..."
-            if ! safe_execute "python3 -m venv venv --system-site-packages" "Creating virtual environment with system packages"; then
+            if ! safe_execute "python3 -m venv \"$venv_dir\" --system-site-packages" "Creating virtual environment with system packages"; then
                 log_error "Virtual environment creation failed"
                 return 1
             fi
@@ -622,7 +636,7 @@ install_nexus() {
     fi
     
     # Activate virtual environment
-    if ! source venv/bin/activate; then
+    if ! source "$venv_dir/bin/activate"; then
         log_error "Failed to activate virtual environment"
         return 1
     fi
@@ -723,6 +737,7 @@ create_cli_wrapper() {
     
     # Get the absolute path to the current Nexus directory
     local nexus_absolute_dir="$(realpath "$nexus_dir")"
+    local venv_dir="\$HOME/.nexus/venv"
     
     sudo tee "$wrapper_script" > /dev/null << EOF
 #!/bin/bash
@@ -730,28 +745,14 @@ create_cli_wrapper() {
 # Automatically activates the virtual environment and runs Nexus
 
 NEXUS_DIR="$nexus_absolute_dir"
-VENV_DIR="\$NEXUS_DIR/venv"
+VENV_DIR="$venv_dir"
 
-# Check if virtual environment exists, if not try to find it
+# Check if virtual environment exists
 if [[ ! -d "\$VENV_DIR" ]]; then
-    # Try alternative locations
-    if [[ -d "\$NEXUS_DIR/../venv" ]]; then
-        VENV_DIR="\$NEXUS_DIR/../venv"
-        NEXUS_DIR="\$(dirname "\$NEXUS_DIR")"
-    elif [[ -d "/opt/pentest-tools/BloodHound.py/venv" ]]; then
-        # Fallback to system Python if virtual environment not found
-        echo "Warning: Nexus virtual environment not found, using system Python"
-        cd "\$NEXUS_DIR" || exit 1
-        export PYTHONPATH="\$NEXUS_DIR:\$PYTHONPATH"
-        python3 -m nexus.cli.main "\$@"
-        exit \$?
-    else
-        echo "Error: Nexus virtual environment not found at \$VENV_DIR"
-        echo "Tried alternative locations but none found."
-        echo "Please run the installation script again or create the virtual environment manually:"
-        echo "  cd \$NEXUS_DIR && python3 -m venv venv && source venv/bin/activate && pip install -e ."
-        exit 1
-    fi
+    echo "Error: Nexus virtual environment not found at \$VENV_DIR"
+    echo "Please run the installation script again or create the virtual environment manually:"
+    echo "  python3 -m venv \$VENV_DIR && source \$VENV_DIR/bin/activate && pip install -e ."
+    exit 1
 fi
 
 # Change to Nexus directory

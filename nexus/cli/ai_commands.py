@@ -130,37 +130,55 @@ def exploit():
 @exploit.command('recommend')
 @click.option('--vuln-file', '-v', required=True, help='Vulnerability data file (JSON)')
 @click.option('--target', '-t', help='Specific target host')
-@click.option('--complexity', type=click.Choice(['trivial', 'easy', 'medium', 'hard', 'expert']), 
+@click.option('--complexity', type=click.Choice(['trivial', 'easy', 'medium', 'hard', 'expert']),
               help='Maximum exploit complexity')
 @click.option('--stealth', is_flag=True, help='Prioritize stealthy exploits')
 @click.option('--output', '-o', help='Output file for recommendations')
 @pass_context
 def exploit_recommend(ctx: NexusContext, vuln_file: str, target: Optional[str], complexity: Optional[str],
                      stealth: bool, output: Optional[str]):
-    """Recommend exploits for discovered vulnerabilities"""
+    """
+    Recommend exploits for discovered vulnerabilities
     
+    Examples:
+    # Generate exploit recommendations from vulnerability file
+    nexus ai exploit recommend --vuln-file scan_results.json
+    
+    # Generate recommendations for specific target
+    nexus ai exploit recommend --vuln-file scan_results.json --target 192.168.1.100
+    
+    # Generate stealthy exploit recommendations
+    nexus ai exploit recommend --vuln-file scan_results.json --stealth
+    
+    # Generate recommendations with complexity limit
+    nexus ai exploit recommend --vuln-file scan_results.json --complexity easy
+    
+    # Save recommendations to file
+    nexus ai exploit recommend --vuln-file scan_results.json --output exploit_recommendations.json
+    """
+     
     ctx.load_config()
-    
+     
     click.echo("Generating exploit recommendations...")
-    
+     
     try:
         # Load vulnerability data
         with open(vuln_file, 'r') as f:
             vuln_data = json.load(f)
-        
+         
         # Initialize recommender
         ollama_client = ctx.get_ollama_client()
         recommender = ExploitRecommender(ollama_client, ctx.config)
-        
+         
         # Process vulnerabilities
         async def get_recommendations():
             all_recommendations = []
-            
+             
             for vuln_info in vuln_data.get('vulnerabilities', []):
                 # Skip if target filter specified
                 if target and vuln_info.get('host') != target:
                     continue
-                
+                 
                 # Create vulnerability object
                 vuln = Vulnerability(
                     vuln_id=vuln_info.get('id', ''),
@@ -173,28 +191,28 @@ def exploit_recommend(ctx: NexusContext, vuln_file: str, target: Optional[str], 
                     service=vuln_info.get('service'),
                     exploitable=vuln_info.get('exploitable', False)
                 )
-                
+                 
                 # Get recommendations
                 context = {
                     'stealth_required': stealth,
                     'max_complexity': complexity
                 }
-                
+                 
                 recommendations = await recommender.recommend_exploits(vuln, context)
                 all_recommendations.extend(recommendations)
-            
+             
             return all_recommendations
-        
+         
         # Run recommendations
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         recommendations = loop.run_until_complete(get_recommendations())
         loop.close()
-        
+         
         if not recommendations:
             click.echo("No exploit recommendations found")
             return
-        
+         
         # Group by severity
         by_severity = {}
         for rec in recommendations:
@@ -202,27 +220,27 @@ def exploit_recommend(ctx: NexusContext, vuln_file: str, target: Optional[str], 
             if severity not in by_severity:
                 by_severity[severity] = []
             by_severity[severity].append(rec)
-        
+         
         # Display results
         click.echo(f"\nFound {len(recommendations)} exploit recommendations:")
-        
+         
         for severity in ['critical', 'high', 'medium', 'low']:
             if severity in by_severity:
                 click.echo(f"\n{severity.upper()} Severity:")
-                
+                 
                 for rec in by_severity[severity][:5]:  # Top 5 per severity
                     success_percent = int(rec.success_probability * 100)
                     stealth_percent = int(rec.stealth_rating * 100)
-                    
+                     
                     click.echo(f"  Target: {rec.name}")
                     click.echo(f"     Host: {rec.target_vulnerability.host}")
                     click.echo(f"     Success Rate: {success_percent}%")
                     click.echo(f"     Stealth Rating: {stealth_percent}%")
                     click.echo(f"     Complexity: {rec.complexity.value}")
-                    
+                     
                     if rec.metasploit_module:
                         click.echo(f"     MSF Module: {rec.metasploit_module}")
-        
+         
         # Save detailed results
         if output:
             detailed_results = []
@@ -240,11 +258,11 @@ def exploit_recommend(ctx: NexusContext, vuln_file: str, target: Optional[str], 
                     'execution_steps': rec.execution_steps,
                     'requirements': rec.requirements
                 })
-            
+             
             with open(output, 'w') as f:
                 json.dump(detailed_results, f, indent=2)
             click.echo(f"\nDetailed recommendations saved to: {output}")
-        
+         
     except Exception as e:
         click.echo(f"ERROR: Exploit recommendation failed: {e}", err=True)
 

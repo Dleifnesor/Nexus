@@ -38,19 +38,19 @@ logger = logging.getLogger(__name__)
 
 @click.group()
 @click.version_option(version=__version__, prog_name="nexus")
-@click.option('--config', '-c', 'config_path', 
+@click.option('--config', '-c', 'config_path',
               help='Path to configuration file')
-@click.option('--verbose', '-v', is_flag=True, 
+@click.option('--verbose', '-v', is_flag=True,
               help='Enable verbose output')
 @pass_context
 def cli(ctx: NexusContext, config_path: Optional[str], verbose: bool):
     """
     Nexus AI-Powered Penetration Testing Tool
-    
+     
     A comprehensive AI-driven penetration testing automation framework
     designed for professional red team assessments and authorized
     penetration testing engagements.
-    
+     
     Features:
     • AI-powered decision making and script generation
     • Support for 100+ Kali Linux tools
@@ -58,12 +58,40 @@ def cli(ctx: NexusContext, config_path: Optional[str], verbose: bool):
     • Custom script generation and execution
     • Comprehensive safety mechanisms
     • Professional reporting and evidence collection
+     
+    Examples:
+    # Run autonomous penetration test with natural language objective
+    nexus run --auto "find SQL injection vulnerabilities in the web app"
+    
+    # Create a new campaign
+    nexus campaign create --name "Web App Assessment" --target "example.com"
+    
+    # List available tools
+    nexus tools list
+    
+    # Generate a custom port scanner script
+    nexus script generate --purpose network_scanner --target 192.168.1.0/24
+    
+    # Check system health and dependencies
+    nexus health
+    
+    # Configure AI model
+    nexus config set ai.model "huihui_ai/qwen2.5-coder-abliterate:14b"
+    
+    # Set evasion profile for stealth operations
+    nexus evasion set stealth_maximum
+    
+    # Generate exploit recommendations
+    nexus ai exploit recommend --vuln-file vulnerabilities.json
+    
+    # Start AI analysis dashboard
+    nexus dashboard start --port 8080
     
     WARNING: Only use on authorized targets with proper permission.
     """
     ctx.config_path = config_path
     ctx.verbose = verbose
-    
+     
     if verbose:
         logging.getLogger().setLevel(logging.DEBUG)
         logger.debug("Verbose mode enabled")
@@ -176,22 +204,34 @@ def campaign():
 @click.option('--target', '-t', multiple=True, help='Target hosts/networks')
 @click.option('--template', help='Campaign template to use')
 @pass_context
-def campaign_create(ctx: NexusContext, name: str, description: Optional[str], 
+def campaign_create(ctx: NexusContext, name: str, description: Optional[str],
                    target: tuple, template: Optional[str]):
-    """Create a new penetration testing campaign"""
+    """
+    Create a new penetration testing campaign
+    
+    Examples:
+    # Create a simple campaign
+    nexus campaign create --name "Web App Assessment" --target example.com
+    
+    # Create a campaign with multiple targets
+    nexus campaign create --name "Network Pen Test" --target 192.168.1.0/24 --target 10.0.0.0/24
+    
+    # Create a campaign with description and template
+    nexus campaign create --name "Comprehensive Assessment" --description "Full pentest of corporate network" --target corporate.example.com --template advanced_campaign
+    """
     ctx.load_config()
-    
+     
     click.echo(f"Creating campaign: {name}")
-    
+     
     if description:
         click.echo(f"📝 Description: {description}")
-    
+     
     if target:
         click.echo(f"Targets: {', '.join(target)}")
-    
+     
     if template:
         click.echo(f"📋 Template: {template}")
-    
+     
     # TODO: Implement campaign creation logic
     click.echo("Campaign created successfully")
     click.echo("Use 'nexus run --campaign \"{}\"' to start the assessment".format(name))
@@ -267,9 +307,27 @@ def config_show(ctx: NexusContext, section: Optional[str], format: str):
 @click.argument('value')
 @pass_context
 def config_set(ctx: NexusContext, key: str, value: str):
-    """Set a configuration value"""
-    ctx.load_config()
+    """
+    Set a configuration value
     
+    Examples:
+    # Set AI model
+    nexus config set ai.model "huihui_ai/qwen2.5-coder-abliterate:14b"
+    
+    # Set Ollama URL
+    nexus config set ai.ollama_url "http://remote-server:11434"
+    
+    # Set temperature
+    nexus config set ai.temperature 0.8
+    
+    # Enable a tool
+    nexus config set tools.nmap.enabled true
+    
+    # Set custom setting
+    nexus config set organization "My Security Company"
+    """
+    ctx.load_config()
+     
     # Parse key (e.g., "ai.model" -> section="ai", key="model")
     if '.' in key:
         section, setting = key.split('.', 1)
@@ -284,7 +342,7 @@ def config_set(ctx: NexusContext, key: str, value: str):
                     value = int(value)
                 elif isinstance(current_value, float):
                     value = float(value)
-                
+                 
                 setattr(section_obj, setting, value)
                 ctx.config.save_config()
                 click.echo(f"Set {key} = {value}")
@@ -312,19 +370,41 @@ def config_set(ctx: NexusContext, key: str, value: str):
 def run(ctx: NexusContext, campaign: Optional[str], target: Optional[str],
         prompt: Optional[str], auto: Optional[str], dry_run: bool, phase: Optional[str],
         evasion_profile: Optional[str]):
-    """Run a penetration testing campaign"""
-    ctx.load_config()
+    """
+    Run a penetration testing campaign or autonomous mission
     
+    This command can run in two modes:
+    1. Autonomous Mode (--auto): AI-driven penetration testing with natural language objectives
+    2. Standard Mode: Traditional campaign execution with specific targets and tools
+    
+    Examples:
+    # Autonomous mode with natural language objective
+    nexus run --auto "find SQL injection vulnerabilities in the web app"
+    nexus run --auto "get into the SMB server on this network" --target 192.168.1.0/24
+    nexus run --auto "escalate privileges on the Linux server" --evasion-profile stealth_maximum
+    
+    # Standard mode with specific target
+    nexus run --target example.com --phase recon
+    nexus run --target 192.168.1.100 --prompt "Perform comprehensive vulnerability scan"
+    
+    # Run specific campaign
+    nexus run --campaign "Web App Assessment"
+    
+    # Dry run to see planned actions
+    nexus run --auto "find SQL injection" --dry-run
+    """
+    ctx.load_config()
+     
     # Autonomous mode - completely AI-driven
     if auto:
         click.echo("AUTONOMOUS MODE ACTIVATED")
         click.echo(f"Objective: {auto}")
         click.echo("AI will automatically plan and execute the complete mission")
-        
+         
         if dry_run:
             click.echo("\nDRY RUN - Autonomous Mission Plan:")
             click.echo("=" * 60)
-            
+             
             # Show what the autonomous agent would do
             click.echo("AI Analysis Phase:")
             click.echo("  - Parse natural language objective")
@@ -332,78 +412,78 @@ def run(ctx: NexusContext, campaign: Optional[str], target: Optional[str],
             click.echo("  - Generate comprehensive execution plan")
             click.echo("  - Select optimal tools and techniques")
             click.echo("  - Calculate success probability")
-            
+             
             click.echo("\nAutonomous Execution Phases:")
             click.echo("  1. RECONNAISSANCE")
             click.echo("     - DNS enumeration and subdomain discovery")
             click.echo("     - Network discovery and asset identification")
             click.echo("     - OSINT gathering and target profiling")
-            
+             
             click.echo("  2. SCANNING & ENUMERATION")
             click.echo("     - Port scanning with service detection")
             click.echo("     - Web application discovery")
             click.echo("     - SMB/NetBIOS enumeration")
             click.echo("     - Service-specific enumeration")
-            
+             
             click.echo("  3. AI VULNERABILITY ANALYSIS")
             click.echo("     - Cross-tool vulnerability correlation")
             click.echo("     - Attack chain identification")
             click.echo("     - Risk assessment and prioritization")
-            
+             
             click.echo("  4. INTELLIGENT EXPLOITATION")
             click.echo("     - AI exploit recommendation")
             click.echo("     - Custom script generation")
             click.echo("     - Automated exploitation attempts")
             click.echo("     - Success verification")
-            
+             
             click.echo("  5. POST-EXPLOITATION")
             click.echo("     - Privilege escalation")
             click.echo("     - Lateral movement")
             click.echo("     - Persistence establishment")
             click.echo("     - Data collection")
-            
+             
             click.echo("  6. AUTONOMOUS REPORTING")
             click.echo("     - Evidence collection and analysis")
             click.echo("     - Executive and technical reports")
             click.echo("     - Remediation recommendations")
-            
+             
             if evasion_profile:
                 click.echo(f"\nEvasion Profile: {evasion_profile}")
                 click.echo("  - Advanced detection avoidance")
                 click.echo("  - Behavioral mimicry")
                 click.echo("  - Traffic obfuscation")
-            
+             
             click.echo("\nExample autonomous objectives:")
             click.echo('  nexus run --auto "get into the SMB server on this network"')
             click.echo('  nexus run --auto "find SQL injection in the web app"')
             click.echo('  nexus run --auto "escalate privileges on the Linux server"')
             click.echo('  nexus run --auto "establish persistence on the domain controller"')
-            
+             
             return
-        
+         
         try:
             # Initialize autonomous agent
             from nexus.core.autonomous_agent import AutonomousAgent
-            
+             
             ollama_client = ctx.get_ollama_client()
             agent = AutonomousAgent(ollama_client, ctx.config)
-            
+             
             # Prepare context
             context = {}
             if target:
                 context['target'] = target
             if evasion_profile:
                 context['evasion_profile'] = evasion_profile
-            
+             
             # Execute autonomous mission
             import asyncio
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            
+             
             click.echo("\nLaunching autonomous AI agent...")
             result = loop.run_until_complete(agent.execute_autonomous_mission(auto, context))
             loop.close()
-            
+             
             # Display results
             if result['success']:
                 click.echo("\nAUTONOMOUS MISSION COMPLETED")
@@ -414,50 +494,50 @@ def run(ctx: NexusContext, campaign: Optional[str], target: Optional[str],
                 click.echo(f"Vulnerabilities Found: {result['vulnerabilities_found']}")
                 click.echo(f"Active Sessions: {result['active_sessions']}")
                 click.echo(f"Evidence Collected: {len(result['evidence'])} items")
-                
+                 
                 click.echo(f"\nMission Report Generated:")
                 click.echo(f"Mission ID: {result['mission_id']}")
-                
+                 
             else:
                 click.echo("\nAUTONOMOUS MISSION FAILED")
                 click.echo(f"Error: {result['error']}")
                 if 'partial_results' in result:
                     click.echo(f"Partial Results: {result['partial_results']}")
-            
+             
         except ImportError:
             click.echo("ERROR: Autonomous agent not available - install required dependencies")
         except Exception as e:
             click.echo(f"ERROR: Autonomous mission failed: {e}")
-        
+         
         return
-    
+     
     # Standard mode
     if not campaign and not target:
         raise click.ClickException("Either --campaign, --target, or --auto must be specified")
-    
+     
     if dry_run:
         click.echo("Dry run mode - showing planned actions:")
-    
+     
     if campaign:
         click.echo(f"Running campaign: {campaign}")
-    
+     
     if target:
         click.echo(f"Target: {target}")
-    
+     
     if prompt:
         click.echo(f"Custom prompt: {prompt}")
-    
+     
     if phase:
         click.echo(f"Phase: {phase}")
-    
+     
     if evasion_profile:
         click.echo(f"Evasion Profile: {evasion_profile}")
-    
+     
     # TODO: Implement campaign execution logic
     if not dry_run:
         click.echo("Starting penetration testing...")
         click.echo("WARNING: Full implementation in progress")
-        
+         
         # Show what would be implemented
         click.echo("\nPlanned execution flow:")
         click.echo("1. Load campaign configuration and validate scope")
