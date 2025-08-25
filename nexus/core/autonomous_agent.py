@@ -111,7 +111,7 @@ class AutonomousAgent:
             model=self.config.ai.model,
             prompt=prompt,
             system="You are an expert penetration tester analyzing objectives and creating execution plans.",
-            temperature=0.4
+            options={"temperature": 0.4}
         )
         response = await self.ollama_client.generate(request)
         
@@ -160,7 +160,7 @@ class AutonomousAgent:
             model=self.config.ai.model,
             prompt=prompt,
             system="You are an expert penetration tester creating detailed execution plans.",
-            temperature=0.4
+            options={"temperature": 0.4}
         )
         response = await self.ollama_client.generate(request)
         
@@ -266,7 +266,7 @@ class AutonomousAgent:
             model=self.config.ai.model,
             prompt=prompt,
             system="You are an expert penetration tester executing security assessments.",
-            temperature=0.4
+            options={"temperature": 0.4}
         )
         response = await self.ollama_client.generate(request)
         
@@ -317,7 +317,7 @@ class AutonomousAgent:
             model=self.config.ai.model,
             prompt=prompt,
             system="You are an expert penetration tester creating comprehensive security reports.",
-            temperature=0.3
+            options={"temperature": 0.3}
         )
         response = await self.ollama_client.generate(request)
         
