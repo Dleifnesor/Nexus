@@ -9,17 +9,6 @@
 
 **NEW: Autonomous AI Agent** - Just tell Nexus what you want in plain English and it figures out everything else automatically!
 
-## What Makes Nexus Different
-
-Unlike traditional tools that simply execute commands, **Nexus thinks, adapts, and evolves** throughout the assessment process using three breakthrough AI systems:
-
-- **AI Vulnerability Correlation**: Discovers hidden attack chains across complex environments
-- **Intelligent Exploit Recommendation**: Predicts success probability with 85%+ accuracy  
-- **Attack Path Planning**: Plans multi-step attacks using graph theory and AI optimization
-- **Military-Grade Evasion**: 95% stealth rating with adaptive detection avoidance
-- **Enterprise Safety**: Zero-trust security model with comprehensive audit trails
-
-
 ### Installation
 
 #### Prerequisites
@@ -566,4 +555,5 @@ Nexus is designed for authorized penetration testing and security research only.
 
 
 *Nexus: Where artificial intelligence meets cybersecurity excellence*
+
 
