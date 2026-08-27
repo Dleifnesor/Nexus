@@ -1,6 +1,6 @@
 # Nexus
 
-AI-assisted autonomous vulnerability and remediation scanner for Kali/Parrot Linux.
+AI-assisted autonomous vulnerability scanning and remediation tool for Enterprise environments.
 
 Install Nexus on a Kali box inside a company network. It autonomously performs reconnaissance,
 enumeration, vulnerability discovery, validation, and OSINT (including breach-data lookups and
