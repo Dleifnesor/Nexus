@@ -1,14 +1,5 @@
 # Nexus AI-Powered Penetration Testing Tool
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/nexus-security/nexus)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](https://python.org)
-[![Kali Linux](https://img.shields.io/badge/platform-Kali%20Linux-red.svg)](https://kali.org)
-
-**The world's first truly intelligent penetration testing platform** that combines advanced AI decision-making with comprehensive automation, sophisticated evasion capabilities, and enterprise-grade safety mechanisms.
-
-**NEW: Autonomous AI Agent** - Just tell Nexus what you want in plain English and it figures out everything else automatically!
-
 ### Installation
 
 #### Prerequisites
@@ -525,35 +516,5 @@ mypy nexus/
 - **[Tool Integration Guide](TOOL_INTEGRATION_SYSTEM.md)**: Custom tool integration
 - **[Safety Systems Guide](SAFETY_AND_SCOPE_SYSTEM.md)**: Safety mechanisms
 - **[Installation Guide](KALI_INSTALLATION_SYSTEM.md)**: Detailed setup instructions
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Disclaimer
-
-Nexus is designed for authorized penetration testing and security research only. Users are responsible for ensuring they have proper authorization before testing any systems. The developers assume no liability for misuse of this tool.
-
-## Support
-
-- **Documentation**: [https://nexus-security.github.io/nexus/](https://nexus-security.github.io/nexus/)
-- **Issues**: [GitHub Issues](https://github.com/nexus-security/nexus/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/nexus-security/nexus/discussions)
-- **Security**: [Security Policy](SECURITY.md)
-- **Contact**: [security@nexus-security.com](mailto:security@nexus-security.com)
-
-## Acknowledgments
-
-- [Ollama](https://ollama.ai/) for AI model infrastructure
-- [Qwen Team](https://github.com/QwenLM/Qwen) for the base language model
-- The Kali Linux team for the comprehensive penetration testing platform
-- The open-source security community for tools and inspiration
-
----
-
-**Made with care by the Nexus Security Team**
-
-
-*Nexus: Where artificial intelligence meets cybersecurity excellence*
 
 
