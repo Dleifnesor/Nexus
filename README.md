@@ -35,7 +35,7 @@ Only run Nexus against systems you are explicitly authorized to test.
 ## Install
 
 ```bash
-git clone <repo> && cd nexus
+git clone https://github.com/Dleifnesor/Nexus && cd nexus
 ./scripts/install.sh
 ```
 
