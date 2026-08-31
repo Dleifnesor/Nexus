@@ -35,9 +35,15 @@ log_error() {
 # Check if running as root
 check_root() {
     if [[ $EUID -eq 0 ]]; then
-        log_error "This script should not be run as root for security reasons."
-        log_info "Please run as a regular user with sudo privileges."
-        exit 1
+        log_warning "This script is running as root."
+        log_warning "Running as root is common on Kali Linux, but a regular user with sudo is recommended for security."
+        read -p "Continue as root anyway? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            log_error "Installation cancelled."
+            exit 1
+        fi
+        log_info "Continuing installation as root..."
     fi
 }
 
@@ -101,6 +107,35 @@ install_system_deps() {
     done
     
     log_success "System dependencies installed"
+}
+
+# Install Docker (Kali-aware; any failure is non-fatal)
+install_docker() {
+    log_info "Installing Docker..."
+
+    if grep -q "Kali" /etc/os-release 2>/dev/null; then
+        log_info "Kali Linux detected - installing Docker from Kali repositories..."
+        if ! sudo apt install -y docker.io; then
+            log_warning "Failed to install Docker from Kali repositories."
+            return 1
+        fi
+        if ! sudo systemctl enable --now docker; then
+            log_warning "Failed to enable/start Docker service."
+            return 1
+        fi
+    else
+        log_info "Installing Docker using the official get.docker.com script..."
+        if ! curl -fsSL https://get.docker.com | sh; then
+            log_warning "Docker installation failed via get.docker.com."
+            return 1
+        fi
+        if ! sudo systemctl enable --now docker; then
+            log_warning "Failed to enable/start Docker service."
+            return 1
+        fi
+    fi
+
+    log_success "Docker installed and running successfully"
 }
 
 # Install penetration testing tools
@@ -266,25 +301,28 @@ install_python_security_tools() {
     done
 }
 
-# Install Ollama
+# Install Ollama (non-fatal: failure must not abort the Nexus install)
 install_ollama() {
     log_info "Installing Ollama..."
     
     if command -v ollama &> /dev/null; then
         log_info "Ollama is already installed"
-        return
+        return 0
     fi
     
     # Download and install Ollama
-    curl -fsSL https://ollama.ai/install.sh | sh
+    if ! curl -fsSL https://ollama.ai/install.sh | sh; then
+        log_warning "Ollama installation failed - continuing without Ollama."
+        return 1
+    fi
     
     # Create ollama user and group if they don't exist
     if ! id "ollama" &>/dev/null; then
-        sudo useradd -r -s /bin/false -d /usr/share/ollama -m ollama
+        sudo useradd -r -s /bin/false -d /usr/share/ollama -m ollama || log_warning "Failed to create ollama user"
     fi
     
     # Create systemd service file
-    sudo tee /etc/systemd/system/ollama.service > /dev/null << 'EOF'
+    sudo tee /etc/systemd/system/ollama.service > /dev/null << 'EOF' || log_warning "Failed to write ollama.service"
 [Unit]
 Description=Ollama Service
 After=network-online.target
@@ -303,9 +341,9 @@ WantedBy=default.target
 EOF
     
     # Start Ollama service
-    sudo systemctl daemon-reload
-    sudo systemctl enable ollama
-    sudo systemctl start ollama
+    sudo systemctl daemon-reload || log_warning "Failed to reload systemd"
+    sudo systemctl enable ollama || log_warning "Failed to enable Ollama service"
+    sudo systemctl start ollama || log_warning "Failed to start Ollama service"
     
     # Wait for Ollama to start
     log_info "Waiting for Ollama to start..."
@@ -315,8 +353,8 @@ EOF
     if command -v ollama &> /dev/null && systemctl is-active --quiet ollama; then
         log_success "Ollama installed and running successfully"
     else
-        log_error "Ollama installation failed"
-        exit 1
+        log_warning "Ollama installation could not be verified - continuing without Ollama."
+        log_info "You can install Ollama manually later: curl -fsSL https://ollama.ai/install.sh | sh"
     fi
 }
 
@@ -362,8 +400,9 @@ download_ai_model() {
 install_nexus() {
     log_info "Installing Nexus..."
     
-    # Get the current directory (should be the Nexus directory)
-    local nexus_dir=$(pwd)
+    # Resolve the Nexus repository directory to an absolute path
+    local nexus_dir
+    nexus_dir=$(realpath .)
     
     # Convert line endings for all Python files (in case developed on Windows)
     log_info "Converting line endings to Unix format..."
@@ -374,13 +413,14 @@ install_nexus() {
     find . -name "*.txt" -type f -exec dos2unix {} \; 2>/dev/null || true
     find . -name "*.md" -type f -exec dos2unix {} \; 2>/dev/null || true
     
-    # Create virtual environment
-    if [[ ! -d "venv" ]]; then
-        python3 -m venv venv
+    # Create virtual environment at <repo>/venv
+    local venv_dir="$nexus_dir/venv"
+    if [[ ! -d "$venv_dir" ]]; then
+        python3 -m venv "$venv_dir"
     fi
     
     # Activate virtual environment
-    source venv/bin/activate
+    source "$venv_dir/bin/activate"
     
     # Upgrade pip and install wheel
     pip install --upgrade pip wheel setuptools
@@ -457,7 +497,8 @@ create_cli_wrapper() {
     log_info "Creating CLI wrapper script..."
     
     local wrapper_script="/usr/local/bin/nexus"
-    local nexus_dir="$(pwd)"
+    local nexus_dir
+    nexus_dir=$(realpath .)
     
     sudo tee "$wrapper_script" > /dev/null << EOF
 #!/bin/bash
@@ -467,11 +508,22 @@ create_cli_wrapper() {
 NEXUS_DIR="$nexus_dir"
 VENV_DIR="\$NEXUS_DIR/venv"
 
-# Check if virtual environment exists
+# Check if virtual environment exists; fall back to \$HOME/.nexus/venv
 if [[ ! -d "\$VENV_DIR" ]]; then
-    echo "Error: Nexus virtual environment not found at \$VENV_DIR"
-    echo "Please run the installation script again."
-    exit 1
+    if [[ -d "\$HOME/.nexus/venv" ]]; then
+        VENV_DIR="\$HOME/.nexus/venv"
+    else
+        echo "Error: Nexus virtual environment not found."
+        echo "Checked locations:"
+        echo "  - \$NEXUS_DIR/venv"
+        echo "  - \$HOME/.nexus/venv"
+        echo
+        echo "Manual recovery steps:"
+        echo "  cd \$NEXUS_DIR && python3 -m venv venv && source venv/bin/activate && pip install -e ."
+        echo
+        echo "Then re-run this command, or re-run the installation script."
+        exit 1
+    fi
 fi
 
 # Change to Nexus directory
@@ -627,9 +679,10 @@ main() {
     
     update_system
     install_system_deps
+    install_docker || log_warning "Docker installation failed - continuing without Docker."
     install_pentest_tools
-    install_ollama
-    download_ai_model
+    install_ollama || log_warning "Ollama installation failed - continuing without Ollama."
+    download_ai_model || log_warning "AI model download failed - you can download it later with: ollama pull huihui_ai/qwen2.5-coder-abliterate:14b"
     install_nexus
     create_config_dirs
     create_cli_wrapper
