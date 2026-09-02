@@ -11,7 +11,6 @@ run before the tool command inside the container.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 from ..logging_ import audit, get_logger
 
@@ -25,13 +24,13 @@ class ContainerResult:
     exit_code: int
     stdout: str
     stderr: str
-    container_id: Optional[str] = None
+    container_id: str | None = None
     timed_out: bool = False
     error: str = ""
 
 
 class DockerRunner:
-    def __init__(self, network: Optional[str] = None):
+    def __init__(self, network: str | None = None):
         self.network = network
         self._client = None
 
@@ -117,7 +116,12 @@ class DockerRunner:
         container = None
         try:
             container = client.containers.run(
-                image=image, command=cmd, detach=True, network=self.network or "bridge"
+                image=image,
+                command=cmd,
+                detach=True,
+                network=self.network or "bridge",
+                stdout=True,
+                stderr=True,
             )
             result = container.wait(timeout=timeout)
             stdout = container.logs(stdout=True, stderr=False).decode("utf-8", "replace")

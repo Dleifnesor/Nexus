@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nexus-scanner"
-version = "0.1.0"
 description = "AI-assisted autonomous vulnerability and remediation scanner for Kali/Parrot Linux"
 readme = "README.md"
 requires-python = ">=3.10"
+dynamic = ["version"]
 license = { text = "MIT" }
 authors = [{ name = "Nexus" }]
 dependencies = [
@@ -23,7 +23,7 @@ dependencies = [
 [project.optional-dependencies]
 pdf = ["weasyprint>=61"]
 web = ["fastapi>=0.110", "uvicorn>=0.29"]
-dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "ruff>=0.5"]
 
 [project.scripts]
 nexus = "nexus.cli:main"
@@ -31,6 +31,17 @@ nexus = "nexus.cli:main"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["nexus*"]
+
+[tool.setuptools.dynamic]
+version = { attr = "nexus.__version__" }
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

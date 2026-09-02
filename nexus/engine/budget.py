@@ -21,13 +21,20 @@ class BudgetTracker:
         self.budgets = budgets
         self.counter = counter
         self.actions = 0
+        self.elapsed_offset = 0.0
+        self.start = time.monotonic()
+
+    def restore(self, budget: dict) -> None:
+        """Restore accumulated usage from a previous run (resume support)."""
+        self.actions = int(budget.get("actions", 0))
+        self.elapsed_offset = float(budget.get("elapsed_s", 0.0))
         self.start = time.monotonic()
 
     def record_action(self) -> None:
         self.actions += 1
 
     def elapsed(self) -> float:
-        return time.monotonic() - self.start
+        return time.monotonic() - self.start + self.elapsed_offset
 
     def check(self) -> BudgetState:
         if self.elapsed() >= self.budgets.max_time_seconds:

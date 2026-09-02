@@ -12,7 +12,7 @@ import logging
 import sys
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 _AUDIT_LOGGER_NAME = "nexus.audit"
 _APP_LOGGER_NAME = "nexus"
@@ -35,7 +35,7 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(payload, default=str)
 
 
-def setup_logging(log_dir: Optional[Path] = None, level: int = logging.INFO) -> None:
+def setup_logging(log_dir: Path | None = None, level: int = logging.INFO) -> None:
     """Configure application + audit loggers. Idempotent."""
     app = logging.getLogger(_APP_LOGGER_NAME)
     if getattr(app, "_nexus_configured", False):

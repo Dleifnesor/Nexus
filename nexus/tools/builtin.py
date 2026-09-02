@@ -18,6 +18,11 @@ def tool_available(binary: str) -> bool:
     return shutil.which(binary) is not None
 
 
+def run_host_shell(cmd: str, timeout: int) -> RunResult:
+    """Run a shell command on the host (used to install missing tools)."""
+    return run_host(["/bin/sh", "-lc", cmd], timeout)
+
+
 def run_host(argv: list[str], timeout: int) -> RunResult:
     """Execute argv on the host. Never uses shell=True to avoid injection."""
     try:

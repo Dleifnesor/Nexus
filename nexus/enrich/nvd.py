@@ -5,8 +5,6 @@ product/version string. Responses are cached in the DB to respect NVD rate limit
 """
 from __future__ import annotations
 
-from typing import Optional
-
 import httpx
 
 from ..logging_ import get_logger
@@ -15,17 +13,18 @@ from ..storage.db import Database
 log = get_logger(__name__)
 
 NVD_BASE = "https://services.nvd.nist.gov/rest/json/cves/2.0"
+CPE_BASE = "https://services.nvd.nist.gov/rest/json/cpes/2.0"
 
 
 class NVDClient:
-    def __init__(self, db: Database, api_key: Optional[str] = None):
+    def __init__(self, db: Database, api_key: str | None = None):
         self.db = db
         self.api_key = api_key
 
     def _headers(self) -> dict:
         return {"apiKey": self.api_key} if self.api_key else {}
 
-    def lookup_cve(self, cve_id: str) -> Optional[dict]:
+    def lookup_cve(self, cve_id: str) -> dict | None:
         cve_id = cve_id.upper()
         cache_key = f"nvd:cve:{cve_id}"
         cached = self.db.cache_get(cache_key)
@@ -69,8 +68,60 @@ class NVDClient:
         self.db.cache_put(cache_key, "nvd", {"items": items})
         return items
 
+    def search_cpe(self, product: str, version: str = "", limit: int = 5) -> list[dict]:
+        """Resolve product/version to CPEs, then return CVEs matching those CPEs."""
+        keyword = f"{product} {version}".strip()
+        if not keyword:
+            return []
+        cache_key = f"nvd:cpe:{keyword.lower()}"
+        cached = self.db.cache_get(cache_key)
+        if cached is not None:
+            return cached.get("items", [])
+        try:
+            resp = httpx.get(
+                CPE_BASE,
+                params={"keywordSearch": keyword, "resultsPerPage": limit},
+                headers=self._headers(),
+                timeout=30,
+            )
+            resp.raise_for_status()
+        except httpx.HTTPError as e:
+            log.warning("NVD CPE search failed for %s: %s", keyword, e)
+            return []
+        items: list[dict] = []
+        for prod in resp.json().get("products", [])[:limit]:
+            cpe_name = (prod.get("cpe") or {}).get("cpeName")
+            if cpe_name:
+                items.extend(self._cves_for_cpe(cpe_name, limit))
+        self.db.cache_put(cache_key, "nvd", {"items": items})
+        return items
 
-def _summarize(payload: dict) -> Optional[dict]:
+    def _cves_for_cpe(self, cpe_name: str, limit: int = 5) -> list[dict]:
+        cache_key = f"nvd:cves-for-cpe:{cpe_name}"
+        cached = self.db.cache_get(cache_key)
+        if cached is not None:
+            return cached.get("items", [])
+        try:
+            resp = httpx.get(
+                NVD_BASE,
+                params={"cpeName": cpe_name, "resultsPerPage": limit},
+                headers=self._headers(),
+                timeout=30,
+            )
+            resp.raise_for_status()
+        except httpx.HTTPError as e:
+            log.warning("NVD CPE->CVE lookup failed for %s: %s", cpe_name, e)
+            return []
+        items = []
+        for vuln in resp.json().get("vulnerabilities", [])[:limit]:
+            s = _summarize({"vulnerabilities": [vuln]})
+            if s:
+                items.append(s)
+        self.db.cache_put(cache_key, "nvd", {"items": items})
+        return items
+
+
+def _summarize(payload: dict) -> dict | None:
     vulns = payload.get("vulnerabilities", [])
     if not vulns:
         return None
@@ -82,7 +133,7 @@ def _summarize(payload: dict) -> Optional[dict]:
     return {"cve_id": cve_id, "description": description, "cvss": score, "severity": severity}
 
 
-def _extract_cvss(metrics: dict) -> tuple[Optional[float], str]:
+def _extract_cvss(metrics: dict) -> tuple[float | None, str]:
     for key in ("cvssMetricV31", "cvssMetricV30", "cvssMetricV2"):
         if key in metrics and metrics[key]:
             data = metrics[key][0].get("cvssData", {})
@@ -92,7 +143,7 @@ def _extract_cvss(metrics: dict) -> tuple[Optional[float], str]:
     return None, "unknown"
 
 
-def _sev_from_score(score: Optional[float]) -> str:
+def _sev_from_score(score: float | None) -> str:
     if score is None:
         return "unknown"
     if score >= 9.0:

@@ -2,11 +2,10 @@
 from __future__ import annotations
 
 import enum
-import json
 import os
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 
 class Mode(str, enum.Enum):
@@ -26,8 +25,8 @@ class Mode(str, enum.Enum):
 class LLMConfig:
     provider: str = "ollama"  # ollama | openai | anthropic
     model: str = "llama3.1:8b"
-    base_url: Optional[str] = None  # e.g. http://localhost:11434 for ollama
-    api_key: Optional[str] = None
+    base_url: str | None = None  # e.g. http://localhost:11434 for ollama
+    api_key: str | None = None
     temperature: float = 0.2
     max_output_tokens: int = 2048
 
@@ -46,15 +45,19 @@ class Budgets:
 class Config:
     mode: Mode
     scope_raw: list[str] = field(default_factory=list)  # user-entered IPs/CIDRs/domains
+    scope_exclusions: list[str] = field(default_factory=list)  # excluded IPs/CIDRs/domains
     llm: LLMConfig = field(default_factory=LLMConfig)
     budgets: Budgets = field(default_factory=Budgets)
     out_dir: Path = field(default_factory=lambda: Path.cwd() / "nexus-out")
     data_dir: Path = field(default_factory=lambda: Path.cwd() / "nexus-out" / "data")
     enable_web: bool = False
-    docker_network: Optional[str] = None  # container network policy override
-    nvd_api_key: Optional[str] = None
-    hibp_api_key: Optional[str] = None
-    resume_run_id: Optional[str] = None
+    docker_network: str | None = None  # container network policy override
+    docker_enabled: bool = True  # False = run all tools natively on the host
+    rate_limit_ms: int = 0  # min milliseconds between actions (0 = disabled)
+    max_concurrent: int = 1  # max parallel tool actions per phase iteration
+    nvd_api_key: str | None = None
+    hibp_api_key: str | None = None
+    resume_run_id: str | None = None
     assume_yes: bool = False
 
     @property
@@ -91,9 +94,3 @@ def load_env_overrides(cfg: Config) -> Config:
     if cfg.llm.provider == "ollama" and not cfg.llm.base_url:
         cfg.llm.base_url = "http://localhost:11434"
     return cfg
-
-
-def load_config_file(path: Path) -> dict[str, Any]:
-    if not path.exists():
-        return {}
-    return json.loads(path.read_text(encoding="utf-8"))

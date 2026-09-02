@@ -23,7 +23,35 @@ class CheckResult:
     detail: str
 
 
-COMMON_TOOLS = ["nmap", "theHarvester", "nikto", "whatweb", "subfinder"]
+COMMON_TOOLS = [
+    "nmap",
+    "theHarvester",
+    "nikto",
+    "whatweb",
+    "subfinder",
+    "nuclei",
+    "sqlmap",
+    "ffuf",
+    "wpscan",
+    "gitleaks",
+    "dalfox",
+    "netexec",
+    "testssl",
+    "gau",
+    "trivy",
+    "grype",
+    "lynis",
+    "naabu",
+    "httpx",
+    "wafw00f",
+    "gowitness",
+    "puredns",
+    "dnsx",
+    "ssh-audit",
+    "kerbrute",
+    "hydra",
+    "bloodhound-python",
+]
 
 
 def check_docker(cfg: Config) -> CheckResult:
@@ -43,9 +71,16 @@ def check_llm(cfg: Config) -> CheckResult:
         try:
             r = httpx.get(base + "/api/tags", timeout=5)
             r.raise_for_status()
-            models = [m.get("name") for m in r.json().get("models", [])]
-            ok = cfg.llm.model in models or not models
-            return CheckResult("llm(ollama)", True, f"reachable; models={models[:5]}")
+            models = [m for m in (x.get("name") for x in r.json().get("models", [])) if m]
+            requested = cfg.llm.model
+            base = requested.split(":")[0]
+            ok = not models or any(m == requested or m.split(":")[0] == base for m in models)
+            detail = (
+                f"reachable; models={models[:5]}"
+                if ok
+                else f"model '{requested}' not found; available={models[:5]}"
+            )
+            return CheckResult("llm(ollama)", ok, detail)
         except Exception as e:
             return CheckResult("llm(ollama)", False, f"unreachable: {e}")
     # cloud providers: just check for API key

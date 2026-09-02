@@ -12,14 +12,14 @@ templates with the {target}/{args} placeholders substituted.
 """
 from __future__ import annotations
 
+import threading
 import time
 from dataclasses import dataclass
-from typing import Optional
 
 from ..logging_ import audit, get_logger
-from ..scope.scope import Scope, ScopeError
+from ..scope.scope import Scope, ScopeError, _extract_host
 from ..storage.db import Database
-from ..tools.builtin import RunResult, run_host, tool_available
+from ..tools.builtin import RunResult, run_host, run_host_shell, tool_available
 from ..tools.container import ContainerResult, DockerRunner
 from ..tools.parsers import ParseResult, get_parser
 from ..tools.registry import Registry, ToolEntry
@@ -27,6 +27,7 @@ from ..tools.registry import Registry, ToolEntry
 log = get_logger(__name__)
 
 INTRUSIVE_CATEGORIES = {"vuln", "exploit"}
+INSTALL_TIMEOUT = 1800
 
 
 @dataclass
@@ -35,7 +36,7 @@ class ActionOutcome:
     tool: str
     target: str
     exit_code: int
-    parsed: Optional[ParseResult] = None
+    parsed: ParseResult | None = None
     error: str = ""
     timed_out: bool = False
     new_assets: int = 0
@@ -51,6 +52,8 @@ class Executor:
         docker: DockerRunner,
         run_id: str,
         max_retries: int = 2,
+        rate_limit_ms: int = 0,
+        containerize: bool = True,
     ):
         self.db = db
         self.registry = registry
@@ -58,8 +61,24 @@ class Executor:
         self.docker = docker
         self.run_id = run_id
         self.max_retries = max_retries
+        self.rate_limit_ms = rate_limit_ms
+        self.containerize = containerize
+        self._last_action_at = 0.0
+        self._throttle_lock = threading.Lock()
+        self._installing: set[str] = set()
 
-    def run_tool(self, tool_name: str, target: str, phase: str, extra_args: Optional[list[str]] = None) -> ActionOutcome:
+    def _throttle(self) -> None:
+        if self.rate_limit_ms <= 0:
+            return
+        with self._throttle_lock:
+            now = time.monotonic()
+            elapsed_ms = (now - self._last_action_at) * 1000
+            wait_ms = self.rate_limit_ms - elapsed_ms
+            if wait_ms > 0:
+                time.sleep(wait_ms / 1000)
+            self._last_action_at = time.monotonic()
+
+    def run_tool(self, tool_name: str, target: str, phase: str, extra_args: list[str] | None = None) -> ActionOutcome:
         entry = self.registry.get(tool_name)
         if entry is None:
             return ActionOutcome(False, tool_name, target, 1, error=f"unknown tool: {tool_name}")
@@ -73,7 +92,9 @@ class Executor:
         if entry.category in INTRUSIVE_CATEGORIES:
             audit("action.intrusive", tool=tool_name, target=target, category=entry.category, phase=phase)
 
-        argv = _build_argv(entry, target, extra_args or [])
+        self._throttle()
+
+        argv = _build_argv(entry, target, extra_args or [], self._credential_args(entry, target))
         action_id = self.db.start_action(self.run_id, phase, tool_name, target, " ".join(argv))
 
         outcome = self._run_with_retries(entry, argv, target)
@@ -103,7 +124,7 @@ class Executor:
         return outcome
 
     def _run_with_retries(self, entry: ToolEntry, argv: list[str], target: str) -> ActionOutcome:
-        last: Optional[ActionOutcome] = None
+        last: ActionOutcome | None = None
         for attempt in range(self.max_retries + 1):
             if attempt:
                 time.sleep(min(2 ** attempt, 8))  # exponential backoff, capped
@@ -115,20 +136,14 @@ class Executor:
         return last  # type: ignore[return-value]
 
     def _run_once(self, entry: ToolEntry, argv: list[str], target: str) -> ActionOutcome:
-        if entry.builtin and tool_available(argv[0]):
-            res: RunResult = run_host(argv, entry.timeout)
-            oc = ActionOutcome(
-                ok=(res.exit_code == 0 and not res.timed_out),
-                tool=entry.name,
-                target=target,
-                exit_code=res.exit_code,
-                error=res.stderr if res.exit_code != 0 else "",
-                timed_out=res.timed_out,
-            )
-            oc._raw_stdout = res.stdout  # type: ignore[attr-defined]
-            if res.exit_code == 127:
-                oc.error = f"binary not found: {argv[0]}"
-            return oc
+        binary = argv[0]
+        if entry.builtin and tool_available(binary):
+            return self._run_host(entry, argv, target)
+
+        # Host-native execution: never containerize, install on demand.
+        if entry.host_only or not self.containerize:
+            self._install_host(entry)
+            return self._run_host(entry, argv, target)
 
         # non-builtin OR builtin binary missing -> container
         image = entry.image or "kalilinux/kali-rolling"
@@ -145,6 +160,40 @@ class Executor:
         )
         oc._raw_stdout = cres.stdout  # type: ignore[attr-defined]
         return oc
+
+    def _run_host(self, entry: ToolEntry, argv: list[str], target: str) -> ActionOutcome:
+        res: RunResult = run_host(argv, entry.timeout)
+        oc = ActionOutcome(
+            ok=(res.exit_code == 0 and not res.timed_out),
+            tool=entry.name,
+            target=target,
+            exit_code=res.exit_code,
+            error=res.stderr if res.exit_code != 0 else "",
+            timed_out=res.timed_out,
+        )
+        oc._raw_stdout = res.stdout  # type: ignore[attr-defined]
+        if res.exit_code == 127:
+            oc.error = f"binary not found: {argv[0]}"
+        return oc
+
+    def _install_host(self, entry: ToolEntry) -> None:
+        """Install a missing host tool on demand (audit-logged, idempotent)."""
+        if not entry.install:
+            return
+        binary = entry.cmd_template[0] if entry.cmd_template else entry.name
+        if tool_available(binary):
+            return
+        if entry.name in self._installing:
+            return
+        self._installing.add(entry.name)
+        try:
+            audit("tool.install", tool=entry.name, command=entry.install)
+            log.info("Installing %s on host: %s", entry.name, entry.install)
+            res = run_host_shell(entry.install, INSTALL_TIMEOUT)
+            if res.exit_code != 0:
+                log.warning("Install of %s failed: %s", entry.name, res.stderr or res.stdout)
+        finally:
+            self._installing.discard(entry.name)
 
     def _persist(self, parsed: ParseResult, entry: ToolEntry, phase: str) -> tuple[int, int]:
         new_assets = 0
@@ -166,16 +215,39 @@ class Executor:
                 source_tool=entry.name,
             )
             new_findings += 1
+        for c in parsed.credentials:
+            self.db.add_credential(
+                self.run_id,
+                host=c.host,
+                username=c.username,
+                secret=c.password,
+                service=c.service,
+                source_tool=entry.name,
+            )
         return new_assets, new_findings
 
+    def _credential_args(self, entry: ToolEntry, target: str) -> list[str]:
+        if not entry.uses_creds:
+            return []
+        host = _extract_host(target)
+        if not host:
+            return []
+        creds = self.db.list_credentials(self.run_id, host)
+        if not creds:
+            return []
+        c = creds[0]
+        return ["-u", c["username"], "-p", c["secret"] or ""]
 
-def _build_argv(entry: ToolEntry, target: str, extra_args: list[str]) -> list[str]:
+
+def _build_argv(entry: ToolEntry, target: str, extra_args: list[str], cred_args: list[str] | None = None) -> list[str]:
     argv: list[str] = []
     for token in entry.cmd_template:
         if token == "{target}":
             argv.append(target)
         elif token == "{args}":
             argv.extend(extra_args)
+        elif token == "{cred}":
+            argv.extend(cred_args or [])
         else:
             argv.append(token)
     if "{args}" not in entry.cmd_template and extra_args:

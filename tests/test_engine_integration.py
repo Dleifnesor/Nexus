@@ -65,7 +65,6 @@ def test_engine_full_run(tmp_path, monkeypatch):
 
     # Planner: run echocve once per non-preflight phase, then finish.
     run_action = json.dumps({"action_type": "run_tool", "tool": "echocve", "target": "10.0.0.1"})
-    finish = json.dumps({"action_type": "finish_phase", "rationale": "done"})
     # 5 active phases (passive/active/vuln/exploit/reach) each: one run then converge (iters=1)
     responses = []
     for _ in range(5):
@@ -109,4 +108,40 @@ def test_scope_mode_blocks_out_of_scope_tool(tmp_path):
     assert "out of scope" in outcome.error
     # error recorded
     assert any(e["kind"] == "scope" for e in db.list_errors(run_id))
+    db.close()
+
+
+def test_parallel_execution(tmp_path):
+    cfg = Config(
+        mode=Mode.SANDBOX,
+        scope_raw=["10.0.0.1"],
+        llm=LLMConfig(),
+        budgets=Budgets(max_time_seconds=60, max_tokens=10_000, max_actions=40, convergence_iters=1),
+        out_dir=tmp_path / "out",
+        data_dir=tmp_path / "out" / "data",
+        max_concurrent=2,
+    )
+    cfg.ensure_dirs()
+    db = Database(cfg.db_path)
+    run_id = db.create_run(cfg.mode.value, {"raw": cfg.scope_raw}, cfg.budgets.__dict__, {})
+
+    scope = Scope.parse(cfg.mode, cfg.scope_raw)
+    registry = Registry()
+    _register_echo_tool(registry)
+
+    run_a = json.dumps({"action_type": "run_tool", "tool": "echocve", "target": "10.0.0.1"})
+    run_b = json.dumps({"action_type": "run_tool", "tool": "echocve", "target": "10.0.0.2"})
+    provider = ScriptedProvider([run_a, run_b])
+
+    counter = TokenCounter()
+    executor = Executor(db, registry, scope, DockerRunner(), run_id)
+    machine = StateMachine(
+        cfg, db, run_id, scope, provider, registry, executor,
+        Planner(provider, registry), Recovery(provider, registry, db, run_id),
+        BudgetTracker(cfg.budgets, counter), ToolDiscovery(registry, provider, cfg.mode, search_fn=None),
+    )
+    status = machine.run()
+
+    assert status == "completed"
+    assert db.count_actions(run_id) >= 2
     db.close()

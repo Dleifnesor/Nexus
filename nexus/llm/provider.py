@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Optional, Type, TypeVar
+from typing import TypeVar
 
 import httpx
 from pydantic import BaseModel, ValidationError
@@ -38,14 +38,14 @@ class TokenCounter:
 
 
 class BaseProvider:
-    def __init__(self, cfg: LLMConfig, counter: Optional[TokenCounter] = None):
+    def __init__(self, cfg: LLMConfig, counter: TokenCounter | None = None):
         self.cfg = cfg
         self.counter = counter or TokenCounter()
 
     def generate(self, prompt: str, system: str = "") -> str:  # pragma: no cover - interface
         raise NotImplementedError
 
-    def generate_structured(self, prompt: str, model: Type[T], system: str = "") -> T:
+    def generate_structured(self, prompt: str, model: type[T], system: str = "") -> T:
         instruction = (
             f"{prompt}\n\nRespond with ONLY a valid JSON object matching this schema, "
             f"no prose, no markdown fences:\n{json.dumps(model.model_json_schema())}"
@@ -143,7 +143,7 @@ class AnthropicProvider(BaseProvider):
         return text
 
 
-def build_provider(cfg: LLMConfig, counter: Optional[TokenCounter] = None) -> BaseProvider:
+def build_provider(cfg: LLMConfig, counter: TokenCounter | None = None) -> BaseProvider:
     provider = (cfg.provider or "ollama").lower()
     if provider == "ollama":
         return OllamaProvider(cfg, counter)
@@ -154,7 +154,7 @@ def build_provider(cfg: LLMConfig, counter: Optional[TokenCounter] = None) -> Ba
     raise LLMError(f"Unknown LLM provider: {cfg.provider}")
 
 
-def _parse_model(raw: str, model: Type[T]) -> T:
+def _parse_model(raw: str, model: type[T]) -> T:
     data = _extract_json(raw)
     return model.model_validate(data)
 

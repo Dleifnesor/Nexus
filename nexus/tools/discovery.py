@@ -9,7 +9,7 @@ backend is available (or a stub in offline mode).
 """
 from __future__ import annotations
 
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from ..config import Mode
 from ..llm.provider import BaseProvider
@@ -38,14 +38,14 @@ class ToolDiscovery:
         registry: Registry,
         provider: BaseProvider,
         mode: Mode,
-        search_fn: Optional[SearchFn] = None,
+        search_fn: SearchFn | None = None,
     ):
         self.registry = registry
         self.provider = provider
         self.mode = mode
         self.search_fn = search_fn
 
-    def discover(self, query: str) -> Optional[ToolEntry]:
+    def discover(self, query: str) -> ToolEntry | None:
         if self.search_fn is None:
             log.warning("No search backend configured; cannot discover tools for: %s", query)
             return None
@@ -54,8 +54,6 @@ class ToolDiscovery:
         except Exception as e:
             log.warning("Tool discovery search failed: %s", e)
             return None
-
-        from ..llm.schema import BaseModel  # not used; keep imports tidy
 
         prompt = (
             f"A security assessment needs a tool for: {query}\n\n"

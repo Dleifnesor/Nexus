@@ -36,6 +36,37 @@ def test_findings_and_remediation(tmp_path):
     assert db.get_remediation(fid)["summary"] == "fix it"
 
 
+def test_update_finding_risk_metadata(tmp_path):
+    db = make_db(tmp_path)
+    rid = db.create_run("scope", {}, {}, {})
+    fid = db.add_finding(rid, "Test", severity="high", cve_ids=["CVE-2021-1"])
+    db.update_finding_cve(fid, ["CVE-2021-1"], 7.5, "high", epss=0.9, exploit_available=True)
+    f = db.list_findings(rid)[0]
+    assert f["epss"] == 0.9
+    assert f["exploit_available"] == 1
+
+
+def test_migration_adds_columns(tmp_path):
+    # Simulate a DB created before the epss/exploit_available columns existed.
+    import sqlite3
+
+    path = tmp_path / "old.db"
+    conn = sqlite3.connect(str(path))
+    conn.execute(
+        "CREATE TABLE findings (id TEXT PRIMARY KEY, run_id TEXT, asset_id TEXT, title TEXT, "
+        "description TEXT, severity TEXT, cvss REAL, cve_ids_json TEXT, evidence TEXT, "
+        "source_tool TEXT, created_at REAL)"
+    )
+    conn.commit()
+    conn.close()
+
+    db = Database(path)
+    rid = db.create_run("scope", {}, {}, {})
+    fid = db.add_finding(rid, "Test")
+    db.update_finding_cve(fid, [], None, "info", epss=0.5, exploit_available=False)
+    assert db.list_findings(rid)[0]["epss"] == 0.5
+
+
 def test_checkpoint_roundtrip(tmp_path):
     db = make_db(tmp_path)
     rid = db.create_run("scope", {}, {}, {})
@@ -59,3 +90,22 @@ def test_cache(tmp_path):
     assert db.cache_get("k") is None
     db.cache_put("k", "nvd", {"v": 1})
     assert db.cache_get("k") == {"v": 1}
+
+
+def test_credential_store(tmp_path):
+    db = make_db(tmp_path)
+    rid = db.create_run("scope", {}, {}, {})
+    cid = db.add_credential(rid, "10.0.0.5", "admin", "hunter2", service="ssh", source_tool="hydra")
+    assert cid is not None
+    creds = db.list_credentials(rid, "10.0.0.5")
+    assert len(creds) == 1
+    assert creds[0]["username"] == "admin"
+    assert db.list_credentials(rid, "10.0.0.99") == []
+
+
+def test_knowledge_base(tmp_path):
+    db = make_db(tmp_path)
+    rid = db.create_run("scope", {}, {}, {})
+    db.kb_set(rid, "open_ports", "22,80,443")
+    assert db.kb_get(rid, "open_ports") == "22,80,443"
+    assert db.kb_all(rid) == {"open_ports": "22,80,443"}

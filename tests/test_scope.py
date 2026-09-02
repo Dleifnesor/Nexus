@@ -50,3 +50,23 @@ def test_ipv6():
     s = Scope.parse(Mode.SCOPE, ["2001:db8::/32"])
     assert s.contains("2001:db8::1")
     assert not s.contains("2001:dead::1")
+
+
+def test_exclusions_block_in_scope_targets():
+    s = Scope.parse(Mode.SCOPE, ["example.com", "10.0.0.0/24"], exclusions=["api.example.com", "10.0.0.10"])
+    assert s.contains("www.example.com")
+    assert not s.contains("api.example.com")
+    assert not s.contains("10.0.0.10")
+    assert s.contains("10.0.0.11")
+
+
+def test_exclusions_in_sandbox_mode():
+    s = Scope.parse(Mode.SANDBOX, [], exclusions=["192.168.0.0/16"])
+    assert s.contains("8.8.8.8")
+    assert not s.contains("192.168.1.1")
+
+
+def test_exclusion_enforce_raises():
+    s = Scope.parse(Mode.SCOPE, ["example.com"], exclusions=["blocked.example.com"])
+    with pytest.raises(ScopeError):
+        s.enforce("blocked.example.com", "nmap")

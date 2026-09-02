@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import threading
 from collections import deque
-from typing import Optional
 
 from rich.console import Console, Group
 from rich.live import Live
@@ -28,9 +27,9 @@ class Dashboard:
         self._last_msg = ""
         self._stats: dict = {}
         self._feed: deque[str] = deque(maxlen=12)
-        self._live: Optional[Live] = None
+        self._live: Live | None = None
 
-    def __enter__(self) -> "Dashboard":
+    def __enter__(self) -> Dashboard:
         if self.enabled:
             self._live = Live(self._render(), console=self.console, refresh_per_second=4, screen=False)
             self._live.__enter__()

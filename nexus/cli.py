@@ -38,6 +38,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p.add_argument("--scope-entry", action="append", default=[], help="Scope entry (repeatable): IP/CIDR/domain")
     p.add_argument("--scope-file", type=Path, help="File with one scope entry per line")
+    p.add_argument("--scope-exclude", action="append", default=[], help="Excluded IP/CIDR/domain (repeatable)")
 
     p.add_argument("--llm-provider", default="ollama", choices=["ollama", "openai", "anthropic"])
     p.add_argument("--model", default="llama3.1:8b", help="LLM model name")
@@ -50,9 +51,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     p.add_argument("--out", type=Path, default=Path.cwd() / "nexus-out", help="Output directory")
     p.add_argument("--resume", default=None, help="Resume an existing run by ID")
+    p.add_argument("--diff", default=None, help="Render a finding diff against a previous run ID")
     p.add_argument("--web", action="store_true", help="Enable local read-only web dashboard")
     p.add_argument("--no-tui", action="store_true", help="Disable the live TUI dashboard")
     p.add_argument("--docker-network", default=None, help="Docker network for containerized tools")
+    p.add_argument("--no-docker", action="store_true", help="Run all tools natively on the host (no containers)")
+    p.add_argument("--rate-limit-ms", type=int, default=0, help="Min ms between tool actions (0 = disabled)")
+    p.add_argument("--max-concurrent", type=int, default=1, help="Max parallel tool actions per iteration")
     p.add_argument("-y", "--yes", action="store_true", help="Assume yes to confirmations")
     p.add_argument("--check", action="store_true", help="Run prerequisite checks and exit")
     return p
@@ -123,6 +128,19 @@ def _run_checks(cfg: Config) -> int:
     return 0 if all_ok else 1
 
 
+def _render_diff(cfg: Config, run_id: str, other_run_id: str) -> None:
+    from .report.renderer import Renderer
+    from .storage.db import Database
+
+    db = Database(cfg.db_path)
+    try:
+        outputs = Renderer(db, run_id, cfg.out_dir / "reports").render_diff(other_run_id)
+    finally:
+        db.close()
+    for fmt, path in outputs.items():
+        print(f"  DIFF {fmt.upper()}: {path}")
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     mode = Mode.SANDBOX if args.sandbox else Mode.SCOPE
@@ -149,6 +167,7 @@ def main(argv: list[str] | None = None) -> int:
     cfg = Config(
         mode=mode,
         scope_raw=scope_entries,
+        scope_exclusions=list(args.scope_exclude),
         llm=LLMConfig(provider=args.llm_provider, model=args.model, base_url=args.llm_base_url),
         budgets=Budgets(
             max_time_seconds=args.max_time,
@@ -160,6 +179,9 @@ def main(argv: list[str] | None = None) -> int:
         data_dir=args.out / "data",
         enable_web=args.web,
         docker_network=args.docker_network,
+        docker_enabled=not args.no_docker,
+        rate_limit_ms=args.rate_limit_ms,
+        max_concurrent=args.max_concurrent,
         resume_run_id=args.resume,
         assume_yes=args.yes,
     )
@@ -179,6 +201,8 @@ def main(argv: list[str] | None = None) -> int:
             if cfg.enable_web:
                 start_web_dashboard(cfg.db_path, run_id if run_id != "pending" else "")
             result = runner.run()
+            if args.diff:
+                _render_diff(cfg, result["run_id"], args.diff)
     except KeyboardInterrupt:
         print("\nInterrupted.")
         return 130

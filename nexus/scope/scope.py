@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import ipaddress
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Iterable, Optional
 from urllib.parse import urlparse
 
 from ..config import Mode
@@ -29,10 +29,11 @@ class Scope:
     mode: Mode
     networks: list[ipaddress._BaseNetwork] = field(default_factory=list)
     domains: list[str] = field(default_factory=list)  # normalized lowercase
+    exclusions: list[object] = field(default_factory=list)  # excluded networks/domains
     raw: list[str] = field(default_factory=list)
 
     @classmethod
-    def parse(cls, mode: Mode, entries: Iterable[str]) -> "Scope":
+    def parse(cls, mode: Mode, entries: Iterable[str], exclusions: Iterable[str] = ()) -> Scope:
         networks: list[ipaddress._BaseNetwork] = []
         domains: list[str] = []
         raw: list[str] = []
@@ -48,25 +49,58 @@ class Scope:
                 networks.append(parsed)
             else:
                 log.warning("Ignoring unrecognized scope entry: %s", e)
-        return cls(mode=mode, networks=networks, domains=sorted(set(domains)), raw=raw)
+        excluded: list[object] = []
+        for entry in exclusions:
+            e = entry.strip()
+            if not e:
+                continue
+            parsed = _parse_entry(e)
+            if parsed is not None:
+                excluded.append(parsed)
+            else:
+                log.warning("Ignoring unrecognized exclusion entry: %s", e)
+        return cls(
+            mode=mode,
+            networks=networks,
+            domains=sorted(set(domains)),
+            exclusions=excluded,
+            raw=raw,
+        )
 
     def is_empty(self) -> bool:
         return not self.networks and not self.domains
 
-    def contains(self, target: str) -> bool:
-        """True if the target (IP, hostname, or URL) is within scope."""
-        if self.mode == Mode.SANDBOX:
-            return True
+    def excluded(self, target: str) -> bool:
+        """True if the target matches an explicit exclusion (IP/CIDR/domain)."""
         host = _extract_host(target)
         if host is None:
             return False
         ip = _try_ip(host)
         if ip is not None:
-            return any(ip in net for net in self.networks)
+            if any(ip in e for e in self.exclusions if not isinstance(e, str)):
+                return True
+        host = host.lower().rstrip(".")
+        for e in self.exclusions:
+            if isinstance(e, str) and (host == e or host.endswith("." + e)):
+                return True
+        return False
+
+    def contains(self, target: str) -> bool:
+        """True if the target (IP, hostname, or URL) is within scope and not excluded."""
+        if self.mode == Mode.SANDBOX:
+            return not self.excluded(target)
+        host = _extract_host(target)
+        if host is None:
+            return False
+        ip = _try_ip(host)
+        if ip is not None:
+            if not any(ip in net for net in self.networks):
+                return False
+            return not self.excluded(target)
         host = host.lower().rstrip(".")
         for d in self.domains:
             if host == d or host.endswith("." + d):
-                return True
+                return not self.excluded(target)
         return False
 
     def enforce(self, target: str, action: str = "") -> None:
@@ -83,7 +117,7 @@ class Scope:
             raise ScopeError(f"Target '{target}' is out of scope for action '{action}'.")
 
 
-def _parse_entry(entry: str) -> Optional[object]:
+def _parse_entry(entry: str) -> object | None:
     # try CIDR / network first
     try:
         return ipaddress.ip_network(entry, strict=False)
@@ -106,7 +140,7 @@ def _try_ip(value: str):
         return None
 
 
-def _extract_host(target: str) -> Optional[str]:
+def _extract_host(target: str) -> str | None:
     t = target.strip()
     if not t:
         return None

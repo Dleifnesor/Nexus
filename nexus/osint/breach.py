@@ -9,8 +9,6 @@ skipped (recorded as a coverage gap by the caller).
 """
 from __future__ import annotations
 
-from typing import Optional
-
 import httpx
 
 from ..config import Mode
@@ -23,7 +21,7 @@ HIBP_BASE = "https://haveibeenpwned.com/api/v3"
 
 
 class BreachClient:
-    def __init__(self, scope: Scope, api_key: Optional[str] = None):
+    def __init__(self, scope: Scope, api_key: str | None = None):
         self.scope = scope
         self.api_key = api_key
 

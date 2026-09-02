@@ -7,9 +7,10 @@ Global convergence + budgets bound the whole run.
 """
 from __future__ import annotations
 
-import time
+import json
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import Callable, Optional
 
 from ..config import Config
 from ..llm.provider import BaseProvider
@@ -19,7 +20,8 @@ from ..storage.db import Database
 from ..tools.discovery import ToolDiscovery
 from ..tools.registry import Registry
 from .budget import BudgetTracker
-from .checkpoint import EngineState, save as save_checkpoint
+from .checkpoint import EngineState
+from .checkpoint import save as save_checkpoint
 from .executor import Executor
 from .planner import Planner
 from .recovery import Recovery
@@ -61,7 +63,7 @@ class StateMachine:
         recovery: Recovery,
         budget: BudgetTracker,
         discovery: ToolDiscovery,
-        progress: Optional[ProgressFn] = None,
+        progress: ProgressFn | None = None,
     ):
         self.cfg = cfg
         self.db = db
@@ -78,7 +80,7 @@ class StateMachine:
         self.state = EngineState()
 
     # -- public API ------------------------------------------------------
-    def run(self, start_state: Optional[EngineState] = None) -> str:
+    def run(self, start_state: EngineState | None = None) -> str:
         if start_state:
             self.state = start_state
         audit("run.start", run_id=self.run_id, mode=self.cfg.mode.value)
@@ -133,31 +135,52 @@ class StateMachine:
                 return
 
             context = self._build_context(phase.key)
-            proposal = self.planner.next_action(phase.key, phase.goal, context)
-            self.budget.record_action()
 
-            if proposal.action_type == "finish_phase":
-                self._emit(phase.key, f"Planner finished phase: {proposal.rationale}")
-                return
+            # Propose up to max_concurrent run_tool actions in this iteration.
+            proposals = []
+            for _ in range(max(1, self.cfg.max_concurrent)):
+                proposal = self.planner.next_action(phase.key, phase.goal, context)
+                if proposal.action_type == "finish_phase":
+                    self._emit(phase.key, f"Planner finished phase: {proposal.rationale}")
+                    return
+                if proposal.action_type == "discover_tool":
+                    self._emit(phase.key, f"Discovering tool: {proposal.discovery_query}")
+                    self.discovery.discover(proposal.discovery_query or context[:120])
+                    break
+                proposals.append(proposal)
 
-            if proposal.action_type == "discover_tool":
-                self._emit(phase.key, f"Discovering tool: {proposal.discovery_query}")
-                self.discovery.discover(proposal.discovery_query or context[:120])
+            if not proposals:
                 continue
 
-            # run_tool
+            for proposal in proposals:
+                self.budget.record_action()
+                self._emit(
+                    phase.key,
+                    f"{proposal.tool} -> {proposal.target}",
+                    extra={"rationale": proposal.rationale},
+                )
+
             before_assets = self.db.count_assets(self.run_id)
             before_findings = self.db.count_findings(self.run_id)
-            self._emit(
-                phase.key,
-                f"{proposal.tool} -> {proposal.target}",
-                extra={"rationale": proposal.rationale},
-            )
-            outcome = self.executor.run_tool(
-                proposal.tool, proposal.target, phase.key, proposal.args
-            )
-            if not outcome.ok:
-                self._handle_failure(phase.key, proposal.tool, proposal.target, outcome.error)
+
+            if len(proposals) == 1:
+                p = proposals[0]
+                outcomes = [self.executor.run_tool(p.tool, p.target, phase.key, p.args)]
+            else:
+                with ThreadPoolExecutor(max_workers=self.cfg.max_concurrent) as pool:
+                    futures = [
+                        pool.submit(self.executor.run_tool, p.tool, p.target, phase.key, p.args)
+                        for p in proposals
+                    ]
+                    outcomes = [f.result() for f in futures]
+
+            for proposal, outcome in zip(proposals, outcomes, strict=False):
+                if not outcome.ok:
+                    self._handle_failure(phase.key, proposal.tool, proposal.target, outcome.error)
+                elif outcome.parsed:
+                    for a in outcome.parsed.assets:
+                        if a.type in ("service", "url", "host", "domain"):
+                            self.db.kb_set(self.run_id, f"{a.type}:{a.value}", phase.key)
 
             gained_assets = self.db.count_assets(self.run_id) - before_assets
             gained_findings = self.db.count_findings(self.run_id) - before_findings
@@ -165,8 +188,8 @@ class StateMachine:
                 stale_iters += 1
             else:
                 stale_iters = 0
-                self._enqueue_new_scope_assets(phase.key)
 
+            self.state.budget = self.budget.snapshot()
             save_checkpoint(self.db, self.run_id, phase.key, self.state)
 
             if stale_iters >= self.cfg.budgets.convergence_iters:
@@ -200,25 +223,50 @@ class StateMachine:
         else:
             self.recovery.record_gap(tool, target, error, "skip")
 
-    def _enqueue_new_scope_assets(self, phase: str) -> None:
-        """In scope mode, drop any newly discovered out-of-scope assets from consideration."""
-        for row in self.db.list_assets(self.run_id):
-            if row["discovered_phase"] == "preflight":
-                continue
-            if row["type"] in ("domain", "host", "url") and not self.scope.contains(row["value"]):
-                # Not removed from DB (kept for the report), but will be scope-blocked on use.
-                continue
-
     def _build_context(self, phase: str) -> str:
         assets = self.db.list_assets(self.run_id)
         findings = self.db.list_findings(self.run_id)
-        asset_lines = [f"{a['type']}: {a['value']}" for a in assets[:60]]
-        finding_lines = [f"{f['severity']}: {f['title']}" for f in findings[:30]]
-        return (
-            f"Assets ({len(assets)} total, showing up to 60):\n" + "\n".join(asset_lines) +
-            f"\n\nFindings ({len(findings)} total, showing up to 30):\n" + "\n".join(finding_lines) +
-            f"\n\nScope mode: {self.cfg.mode.value}. In-scope entries: {', '.join(self.scope.raw) or 'unrestricted'}"
+        errors = self.db.list_errors(self.run_id)
+
+        by_type: dict[str, list[str]] = {}
+        for a in assets:
+            by_type.setdefault(a["type"], []).append(a["value"])
+
+        lines = [f"Phase: {phase}"]
+        for t, label in (
+            ("host", "Hosts"),
+            ("domain", "Domains"),
+            ("url", "URLs"),
+            ("service", "Services (open ports/versions)"),
+            ("email", "Emails"),
+        ):
+            values = by_type.get(t, [])
+            shown = ", ".join(values[:40])
+            lines.append(f"{label} ({len(values)}): {shown or 'none'}")
+
+        lines.append(f"Findings ({len(findings)}):")
+        for f in findings[:30]:
+            cves = json.loads(f["cve_ids_json"] or "[]")
+            cve_suffix = f" [{' '.join(cves[:4])}]" if cves else ""
+            lines.append(f"  - {f['severity']}: {f['title']}{cve_suffix}")
+
+        creds = self.db.list_credentials(self.run_id)
+        if creds:
+            lines.append(f"Known credentials ({len(creds)}):")
+            for c in creds[:10]:
+                lines.append(f"  - {c['host']} {c['service'] or ''} {c['username']}:{c['secret'] or ''}")
+
+        recent_errors = [e for e in errors if not e["is_coverage_gap"]][-10:]
+        if recent_errors:
+            lines.append("Recent errors:")
+            for e in recent_errors:
+                lines.append(f"  - [{e['kind']}] {e['message'][:200]}")
+
+        lines.append(
+            f"Scope mode: {self.cfg.mode.value}. "
+            f"In-scope: {', '.join(self.scope.raw) or 'unrestricted'}"
         )
+        return "\n".join(lines)
 
     def _jump_to_reporting(self) -> None:
         for i, p in enumerate(PHASES):
@@ -226,7 +274,7 @@ class StateMachine:
                 self.state.phase_index = i
                 return
 
-    def _emit(self, phase: str, msg: str, extra: Optional[dict] = None) -> None:
+    def _emit(self, phase: str, msg: str, extra: dict | None = None) -> None:
         stats = {
             "assets": self.db.count_assets(self.run_id),
             "findings": self.db.count_findings(self.run_id),

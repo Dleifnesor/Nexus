@@ -5,8 +5,6 @@ imported lazily so the package remains importable without browsers installed.
 """
 from __future__ import annotations
 
-from typing import Optional
-
 from ..logging_ import get_logger
 
 log = get_logger(__name__)
@@ -24,7 +22,7 @@ class Browser:
         except Exception:
             return False
 
-    def fetch_text(self, url: str) -> Optional[str]:
+    def fetch_text(self, url: str) -> str | None:
         """Return the rendered text content of a URL, or None on failure."""
         try:
             from playwright.sync_api import sync_playwright

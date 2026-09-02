@@ -11,8 +11,9 @@ import sqlite3
 import threading
 import time
 import uuid
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Iterable, Optional
+from typing import Any
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS runs (
@@ -62,6 +63,8 @@ CREATE TABLE IF NOT EXISTS findings (
     description TEXT,
     severity TEXT,
     cvss REAL,
+    epss REAL,
+    exploit_available INTEGER,
     cve_ids_json TEXT,
     evidence TEXT,
     source_tool TEXT,
@@ -103,10 +106,30 @@ CREATE TABLE IF NOT EXISTS enrichment_cache (
     fetched_at REAL NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS credentials (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL,
+    host TEXT NOT NULL,
+    service TEXT,
+    username TEXT NOT NULL,
+    secret TEXT,
+    source_tool TEXT,
+    created_at REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS kb_entries (
+    run_id TEXT NOT NULL,
+    key TEXT NOT NULL,
+    value TEXT,
+    updated_at REAL NOT NULL,
+    PRIMARY KEY (run_id, key)
+);
+
 CREATE INDEX IF NOT EXISTS idx_assets_run ON assets(run_id);
 CREATE INDEX IF NOT EXISTS idx_findings_run ON findings(run_id);
 CREATE INDEX IF NOT EXISTS idx_actions_run ON actions(run_id);
 CREATE INDEX IF NOT EXISTS idx_errors_run ON errors(run_id);
+CREATE INDEX IF NOT EXISTS idx_credentials_run ON credentials(run_id);
 """
 
 
@@ -124,7 +147,16 @@ class Database:
         self._conn.execute("PRAGMA journal_mode=WAL;")
         self._conn.execute("PRAGMA foreign_keys=ON;")
         self._conn.executescript(SCHEMA)
+        self._migrate()
         self._conn.commit()
+
+    def _migrate(self) -> None:
+        """Additive migrations for databases created by older schema versions."""
+        for column, decl in (("epss", "REAL"), ("exploit_available", "INTEGER")):
+            try:
+                self._conn.execute(f"ALTER TABLE findings ADD COLUMN {column} {decl}")
+            except sqlite3.OperationalError:
+                pass  # column already present
 
     def close(self) -> None:
         with self._lock:
@@ -160,7 +192,7 @@ class Database:
             (status, time.time(), run_id),
         )
 
-    def get_run(self, run_id: str) -> Optional[sqlite3.Row]:
+    def get_run(self, run_id: str) -> sqlite3.Row | None:
         rows = self._query("SELECT * FROM runs WHERE id=?", (run_id,))
         return rows[0] if rows else None
 
@@ -172,8 +204,8 @@ class Database:
         value: str,
         source: str = "",
         phase: str = "",
-        metadata: Optional[dict] = None,
-    ) -> Optional[str]:
+        metadata: dict | None = None,
+    ) -> str | None:
         """Insert an asset; returns id, or None if it already existed (dedup)."""
         aid = _uid()
         try:
@@ -186,7 +218,7 @@ class Database:
         except sqlite3.IntegrityError:
             return None
 
-    def list_assets(self, run_id: str, type_: Optional[str] = None) -> list[sqlite3.Row]:
+    def list_assets(self, run_id: str, type_: str | None = None) -> list[sqlite3.Row]:
         if type_:
             return self._query(
                 "SELECT * FROM assets WHERE run_id=? AND type=? ORDER BY created_at", (run_id, type_)
@@ -210,9 +242,9 @@ class Database:
         self,
         action_id: str,
         status: str,
-        exit_code: Optional[int] = None,
+        exit_code: int | None = None,
         output_excerpt: str = "",
-        container_id: Optional[str] = None,
+        container_id: str | None = None,
     ) -> None:
         self._exec(
             "UPDATE actions SET status=?, exit_code=?, ended_at=?, output_excerpt=?, container_id=? WHERE id=?",
@@ -229,11 +261,11 @@ class Database:
         title: str,
         description: str = "",
         severity: str = "info",
-        cvss: Optional[float] = None,
-        cve_ids: Optional[list[str]] = None,
+        cvss: float | None = None,
+        cve_ids: list[str] | None = None,
         evidence: str = "",
         source_tool: str = "",
-        asset_id: Optional[str] = None,
+        asset_id: str | None = None,
     ) -> str:
         fid = _uid()
         self._exec(
@@ -254,10 +286,18 @@ class Database:
     def count_findings(self, run_id: str) -> int:
         return self._query("SELECT COUNT(*) c FROM findings WHERE run_id=?", (run_id,))[0]["c"]
 
-    def update_finding_cve(self, finding_id: str, cve_ids: list[str], cvss: Optional[float], severity: str) -> None:
+    def update_finding_cve(
+        self,
+        finding_id: str,
+        cve_ids: list[str],
+        cvss: float | None,
+        severity: str,
+        epss: float | None = None,
+        exploit_available: bool = False,
+    ) -> None:
         self._exec(
-            "UPDATE findings SET cve_ids_json=?, cvss=?, severity=? WHERE id=?",
-            (json.dumps(cve_ids), cvss, severity, finding_id),
+            "UPDATE findings SET cve_ids_json=?, cvss=?, severity=?, epss=?, exploit_available=? WHERE id=?",
+            (json.dumps(cve_ids), cvss, severity, epss, int(exploit_available), finding_id),
         )
 
     # -- remediations ----------------------------------------------------
@@ -272,7 +312,7 @@ class Database:
         )
         return rid
 
-    def get_remediation(self, finding_id: str) -> Optional[sqlite3.Row]:
+    def get_remediation(self, finding_id: str) -> sqlite3.Row | None:
         rows = self._query("SELECT * FROM remediations WHERE finding_id=?", (finding_id,))
         return rows[0] if rows else None
 
@@ -282,7 +322,7 @@ class Database:
         run_id: str,
         kind: str,
         message: str,
-        action_id: Optional[str] = None,
+        action_id: str | None = None,
         recovery_action: str = "",
         is_coverage_gap: bool = False,
     ) -> str:
@@ -311,7 +351,7 @@ class Database:
         )
         return cid
 
-    def latest_checkpoint(self, run_id: str) -> Optional[dict]:
+    def latest_checkpoint(self, run_id: str) -> dict | None:
         rows = self._query(
             "SELECT * FROM checkpoints WHERE run_id=? ORDER BY created_at DESC LIMIT 1", (run_id,)
         )
@@ -320,7 +360,7 @@ class Database:
         return {"phase": rows[0]["phase"], "state": json.loads(rows[0]["state_json"])}
 
     # -- enrichment cache ------------------------------------------------
-    def cache_get(self, key: str) -> Optional[dict]:
+    def cache_get(self, key: str) -> dict | None:
         rows = self._query("SELECT payload_json FROM enrichment_cache WHERE key=?", (key,))
         return json.loads(rows[0]["payload_json"]) if rows else None
 
@@ -329,3 +369,38 @@ class Database:
             "INSERT OR REPLACE INTO enrichment_cache(key, source, payload_json, fetched_at) VALUES(?,?,?,?)",
             (key, source, json.dumps(payload), time.time()),
         )
+
+    # -- credential store -------------------------------------------------
+    def add_credential(
+        self, run_id: str, host: str, username: str, secret: str = "", service: str = "", source_tool: str = ""
+    ) -> str | None:
+        cid = _uid()
+        try:
+            self._exec(
+                "INSERT INTO credentials(id, run_id, host, service, username, secret, source_tool, created_at)"
+                " VALUES(?,?,?,?,?,?,?,?)",
+                (cid, run_id, host, service, username, secret, source_tool, time.time()),
+            )
+            return cid
+        except sqlite3.IntegrityError:
+            return None
+
+    def list_credentials(self, run_id: str, host: str | None = None) -> list[sqlite3.Row]:
+        if host:
+            return self._query("SELECT * FROM credentials WHERE run_id=? AND host=? ORDER BY created_at", (run_id, host))
+        return self._query("SELECT * FROM credentials WHERE run_id=? ORDER BY created_at", (run_id,))
+
+    # -- knowledge base (cross-phase memory) ------------------------------
+    def kb_set(self, run_id: str, key: str, value: str) -> None:
+        self._exec(
+            "INSERT OR REPLACE INTO kb_entries(run_id, key, value, updated_at) VALUES(?,?,?,?)",
+            (run_id, key, value, time.time()),
+        )
+
+    def kb_get(self, run_id: str, key: str) -> str | None:
+        rows = self._query("SELECT value FROM kb_entries WHERE run_id=? AND key=?", (run_id, key))
+        return rows[0]["value"] if rows else None
+
+    def kb_all(self, run_id: str) -> dict[str, str]:
+        rows = self._query("SELECT key, value FROM kb_entries WHERE run_id=?", (run_id,))
+        return {r["key"]: r["value"] for r in rows}
