@@ -41,6 +41,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 <p class="meta">Run {{ run.id }} &middot; Mode: {{ run.mode }} &middot; Generated {{ generated }}</p>
 
 <h2>Executive Summary</h2>
+{% if run.objective %}<p><strong>Objective:</strong> {{ run.objective }}</p>{% endif %}
 <p>The engagement discovered <strong>{{ assets|length }}</strong> assets and
 <strong>{{ findings|length }}</strong> findings
 ({{ counts.critical }} critical, {{ counts.high }} high, {{ counts.medium }} medium,
@@ -221,8 +222,17 @@ class Renderer:
         findings.sort(key=lambda x: _SEVERITY_ORDER.get(x["severity"], 5))
         assets = [dict(a) for a in self.db.list_assets(self.run_id)]
         gaps = [dict(g) for g in self.db.list_coverage_gaps(self.run_id)]
+        objective = ""
+        if run and run["config_json"]:
+            try:
+                objective = (json.loads(run["config_json"]) or {}).get("objective", "") or ""
+            except (json.JSONDecodeError, TypeError):
+                objective = ""
         return {
-            "run": {"id": run["id"], "mode": run["mode"]} if run else {"id": self.run_id, "mode": ""},
+            "run": (
+                {"id": run["id"], "mode": run["mode"], "objective": objective}
+                if run else {"id": self.run_id, "mode": "", "objective": objective}
+            ),
             "generated": time.strftime("%Y-%m-%d %H:%M:%S"),
             "counts": counts,
             "findings": findings,

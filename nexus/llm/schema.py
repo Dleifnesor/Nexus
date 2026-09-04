@@ -40,3 +40,33 @@ class RemediationOutput(BaseModel):
     summary: str = ""
     steps_md: str = ""
     references: list[str] = Field(default_factory=list)
+
+
+class EngagementBrief(BaseModel):
+    """Structured engagement parameters extracted from a free-text operator prompt."""
+
+    scope: list[str] = Field(
+        default_factory=list,
+        description="In-scope targets as IPs, CIDR ranges, or domains, verbatim from the prompt.",
+    )
+    exclusions: list[str] = Field(
+        default_factory=list, description="Targets explicitly excluded from the engagement."
+    )
+    objective: str = Field(
+        default="", description="One or two sentences describing the goal of the assessment."
+    )
+    focus: list[str] = Field(
+        default_factory=list,
+        description="Short focus tags implied by the prompt, e.g. web-auth, secrets, ad, tls.",
+    )
+
+
+class SkillDraft(BaseModel):
+    """A reusable playbook the engine distills from a completed run."""
+
+    name: str = Field(description="Short kebab-case identifier, e.g. wordpress-enum.")
+    description: str = Field(description="One line: when this playbook applies.")
+    triggers: list[str] = Field(
+        default_factory=list, description="Lowercase keywords that signal this skill is relevant."
+    )
+    body: str = Field(description="The procedure: which tools, in what order, what to look for.")

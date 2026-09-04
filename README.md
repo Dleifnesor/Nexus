@@ -61,6 +61,10 @@ nexus --scope
 # Non-interactive scope
 nexus --scope --scope-entry 10.0.0.0/24 --scope-entry example.com
 
+# Describe the engagement in plain language (scope + objective from one prompt)
+nexus --scope --prompt "Assess the web app at example.com and the 10.0.0.0/24 subnet. \
+Focus on auth bypass and exposed secrets. Leave 10.0.0.5 out of scope."
+
 # Isolated lab, unrestricted
 nexus --sandbox --scope-entry 10.0.0.0/24 --yes
 
@@ -78,6 +82,10 @@ nexus --scope --web
 | `--scope` / `--sandbox` | Operation mode (one required) |
 | `--scope-entry` / `--scope-file` | Provide scope non-interactively |
 | `--scope-exclude` | Exclude an IP/CIDR/domain from scope (repeatable) |
+| `--prompt` | Describe the engagement in plain language; scope, exclusions, and objective are extracted and confirmed |
+| `--objective` | Free-text engagement objective (steers the planner and report) |
+| `--no-skills` / `--no-learn` | Don't load / don't write reusable skill playbooks |
+| `--skills-dir` | Skill library location (default `~/.nexus/skills`) |
 | `--docker-network` | Docker network for containerized tools |
 | `--no-docker` | Run all tools natively on the host (auto-install missing built-in tools) |
 | `--no-tool-search` | Disable automatic discovery/installation of new tools via web search (on by default) |
@@ -212,6 +220,33 @@ setting dictates — in an ephemeral container by default, or natively on the ho
 content, the install command is validated against a package-manager allowlist
 (`apt`/`pip`/`pipx`/`go`/`cargo`/`gem`/`npm` installs only; anything with shell operators is
 rejected), so only a single package install can ever run — never an arbitrary shell command.
+
+## Prompt-based scope & objective
+
+Instead of listing scope with flags, describe the engagement in plain language with `--prompt`.
+Nexus extracts the in-scope targets, exclusions, and an objective; in `--scope` mode it prints
+the parsed brief and asks you to confirm before anything runs (auto-confirmed with `--yes`).
+The objective then steers the planner's action choices and frames the report's executive
+summary. Explicit `--scope-entry` flags always override the prompt-derived scope.
+
+## Skills (reusable playbooks)
+
+Nexus keeps a library of markdown **skills** — short playbooks like "when WordPress is detected,
+run wpscan then nuclei with cms templates." Relevant skills are matched to the current
+engagement context (by trigger keywords) and surfaced to the planner as reference material, so
+recurring situations are handled consistently.
+
+The library lives at `~/.nexus/skills` (override with `--skills-dir`) and **grows over time**:
+after each run Nexus distills what worked into a new or updated skill (`source: learned`),
+upserting by name so the library converges rather than bloating. A handful of curated built-in
+skills ship with Nexus as a starting point.
+
+- `--no-skills` — don't load skills for this run.
+- `--no-learn` — load skills but don't write new ones.
+
+Skills influence only which registered tool the planner picks next; they can never introduce a
+command or bypass the scope gate, and their text is treated as untrusted reference data. Every
+learned skill is a plain, auditable file and every write is recorded in the audit log.
 
 ### Native (host) execution
 

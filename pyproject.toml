@@ -32,6 +32,9 @@ nexus = "nexus.cli:main"
 where = ["."]
 include = ["nexus*"]
 
+[tool.setuptools.package-data]
+"nexus.skills" = ["builtin/*.md"]
+
 [tool.setuptools.dynamic]
 version = { attr = "nexus.__version__" }
 

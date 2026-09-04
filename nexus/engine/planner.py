@@ -11,13 +11,14 @@ log = get_logger(__name__)
 
 
 class Planner:
-    def __init__(self, provider: BaseProvider, registry: Registry):
+    def __init__(self, provider: BaseProvider, registry: Registry, objective: str = ""):
         self.provider = provider
         self.registry = registry
+        self.objective = objective
 
     def next_action(self, phase: str, phase_goal: str, context: str) -> ActionProposal:
         tools = self.registry.describe_for_phase(phase)
-        prompt = planner_prompt(phase, phase_goal, tools, context)
+        prompt = planner_prompt(phase, phase_goal, tools, context, objective=self.objective)
         try:
             proposal = self.provider.generate_structured(prompt, ActionProposal, system=SYSTEM_PLANNER)
         except (LLMError, ValueError) as e:

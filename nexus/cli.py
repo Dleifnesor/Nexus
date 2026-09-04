@@ -11,6 +11,7 @@ Exactly one mode must be selected.
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -39,6 +40,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--scope-entry", action="append", default=[], help="Scope entry (repeatable): IP/CIDR/domain")
     p.add_argument("--scope-file", type=Path, help="File with one scope entry per line")
     p.add_argument("--scope-exclude", action="append", default=[], help="Excluded IP/CIDR/domain (repeatable)")
+    p.add_argument(
+        "--prompt",
+        default=None,
+        help="Describe the engagement in plain language; Nexus extracts scope, exclusions, "
+        "and objective (confirmed before running in scope mode)",
+    )
+    p.add_argument("--objective", default=None, help="Free-text engagement objective (steers planner and report)")
+    p.add_argument("--no-skills", action="store_true", help="Do not load reusable skill playbooks")
+    p.add_argument("--no-learn", action="store_true", help="Do not write new skills after the run")
+    p.add_argument("--skills-dir", type=Path, default=None, help="Skill library directory (default: ~/.nexus/skills)")
 
     p.add_argument("--llm-provider", default="ollama", choices=["ollama", "openai", "anthropic"])
     p.add_argument("--model", default="llama3.1:8b", help="LLM model name")
@@ -85,6 +96,51 @@ def _collect_scope(args) -> list[str]:
                 break
             entries.append(line)
     return [e for e in entries if e]
+
+
+def _intake_provider(args):
+    """Build an LLM provider for the prompt-intake step (before the run starts)."""
+    from .llm.provider import build_provider
+
+    llm = LLMConfig(provider=args.llm_provider, model=args.model, base_url=args.llm_base_url)
+    llm.api_key = llm.api_key or os.environ.get("NEXUS_LLM_API_KEY")
+    llm.base_url = llm.base_url or os.environ.get("NEXUS_LLM_BASE_URL")
+    if llm.provider == "ollama" and not llm.base_url:
+        llm.base_url = "http://localhost:11434"
+    return build_provider(llm)
+
+
+def _run_intake(args, mode, scope_entries: list[str], exclusions: list[str]):
+    """Extract scope/objective from --prompt (if given). Returns (scope, exclusions,
+    objective, focus). In scope mode the operator must confirm the parsed brief."""
+    objective = args.objective or ""
+    focus: list[str] = []
+    if not args.prompt:
+        return scope_entries, exclusions, objective, focus
+
+    from .intake.brief import parse_brief
+
+    brief = parse_brief(_intake_provider(args), args.prompt)
+    if not scope_entries:  # explicit --scope-entry always wins
+        scope_entries = list(brief.scope)
+    exclusions = exclusions + [e for e in brief.exclusions if e not in exclusions]
+    objective = objective or brief.objective
+    focus = brief.focus
+
+    print("\nParsed engagement brief:")
+    print(f"  Objective : {objective or '(none)'}")
+    print(f"  Scope     : {', '.join(scope_entries) or '(none)'}")
+    print(f"  Exclusions: {', '.join(exclusions) or '(none)'}")
+    print(f"  Focus     : {', '.join(focus) or '(none)'}")
+    if mode == Mode.SCOPE and not args.yes:
+        try:
+            ans = input("\nProceed with this scope? [y/N]: ").strip().lower()
+        except EOFError:
+            ans = ""
+        if ans not in ("y", "yes"):
+            print("Engagement brief not confirmed; aborting.")
+            return None
+    return scope_entries, exclusions, objective, focus
 
 
 def _confirm_sandbox(assume_yes: bool) -> bool:
@@ -175,14 +231,20 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     scope_entries = _collect_scope(args)
+    intake = _run_intake(args, mode, scope_entries, list(args.scope_exclude))
+    if intake is None:  # operator declined the parsed brief
+        return 2
+    scope_entries, exclusions, objective, focus = intake
+
     if mode == Mode.SCOPE and not scope_entries and not args.resume:
-        print("Scope mode requires at least one scope entry.")
+        print("Scope mode requires at least one scope entry (via --scope-entry or --prompt).")
         return 2
 
     cfg = Config(
         mode=mode,
         scope_raw=scope_entries,
-        scope_exclusions=list(args.scope_exclude),
+        scope_exclusions=exclusions,
+        objective=objective,
         llm=LLMConfig(provider=args.llm_provider, model=args.model, base_url=args.llm_base_url),
         budgets=Budgets(
             max_time_seconds=args.max_time,
@@ -196,6 +258,10 @@ def main(argv: list[str] | None = None) -> int:
         docker_network=args.docker_network,
         docker_enabled=not args.no_docker,
         tool_search=not args.no_tool_search,
+        skills_enabled=not args.no_skills,
+        skills_learn=not args.no_learn,
+        skills_dir=args.skills_dir,
+        skills_focus=focus,
         rate_limit_ms=args.rate_limit_ms,
         max_concurrent=args.max_concurrent,
         resume_run_id=args.resume,

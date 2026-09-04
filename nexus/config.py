@@ -46,6 +46,7 @@ class Config:
     mode: Mode
     scope_raw: list[str] = field(default_factory=list)  # user-entered IPs/CIDRs/domains
     scope_exclusions: list[str] = field(default_factory=list)  # excluded IPs/CIDRs/domains
+    objective: str = ""  # free-text engagement goal (steers the planner and report)
     llm: LLMConfig = field(default_factory=LLMConfig)
     budgets: Budgets = field(default_factory=Budgets)
     out_dir: Path = field(default_factory=lambda: Path.cwd() / "nexus-out")
@@ -55,6 +56,10 @@ class Config:
     docker_enabled: bool = True  # False = run all tools natively on the host
     tool_search: bool = True  # discover & install new tools via web search when needed
     allow_tool_install: bool = True  # allow installing LLM-discovered tools on the host
+    skills_enabled: bool = True  # load reusable playbooks to guide the planner
+    skills_learn: bool = True  # distill new playbooks from completed runs
+    skills_dir: Path | None = None  # skill library location (default: ~/.nexus/skills)
+    skills_focus: list[str] = field(default_factory=list)  # focus tags to prioritize skills
     rate_limit_ms: int = 0  # min milliseconds between actions (0 = disabled)
     max_concurrent: int = 1  # max parallel tool actions per phase iteration
     nvd_api_key: str | None = None
@@ -80,6 +85,7 @@ class Config:
         d["mode"] = self.mode.value
         d["out_dir"] = str(self.out_dir)
         d["data_dir"] = str(self.data_dir)
+        d["skills_dir"] = str(self.skills_dir) if self.skills_dir else None
         # never persist secrets in run metadata
         d["llm"]["api_key"] = bool(self.llm.api_key)
         d.pop("nvd_api_key", None)

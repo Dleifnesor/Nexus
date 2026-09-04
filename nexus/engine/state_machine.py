@@ -64,6 +64,8 @@ class StateMachine:
         budget: BudgetTracker,
         discovery: ToolDiscovery,
         progress: ProgressFn | None = None,
+        skills=None,  # SkillStore | None
+        focus: list[str] | None = None,
     ):
         self.cfg = cfg
         self.db = db
@@ -77,6 +79,8 @@ class StateMachine:
         self.budget = budget
         self.discovery = discovery
         self.progress = progress or (lambda *a: None)
+        self.skills = skills
+        self.focus = focus or []
         self.state = EngineState()
 
     # -- public API ------------------------------------------------------
@@ -286,7 +290,24 @@ class StateMachine:
             f"Scope mode: {self.cfg.mode.value}. "
             f"In-scope: {', '.join(self.scope.raw) or 'unrestricted'}"
         )
+
+        skills_block = self._skills_block("\n".join(lines))
+        if skills_block:
+            lines.append("")
+            lines.append(skills_block)
         return "\n".join(lines)
+
+    def _skills_block(self, context_so_far: str) -> str:
+        if not self.skills:
+            return ""
+        try:
+            from ..skills.select import relevant, render
+
+            chosen = relevant(self.skills.all(), context_so_far, focus=self.focus)
+            return render(chosen)
+        except Exception as e:  # skills are best-effort; never break planning
+            log.debug("Skill selection failed: %s", e)
+            return ""
 
     def _jump_to_reporting(self) -> None:
         for i, p in enumerate(PHASES):

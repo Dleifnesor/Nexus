@@ -89,18 +89,30 @@ class EngagementRunner:
             containerize=cfg.docker_enabled,
             allow_tool_install=cfg.allow_tool_install,
         )
-        planner = Planner(provider, registry)
+        planner = Planner(provider, registry, objective=cfg.objective)
         recovery = Recovery(provider, registry, self.db, run_id)
         budget = BudgetTracker(cfg.budgets, counter)
         if start_state and start_state.budget:
             budget.restore(start_state.budget)
         discovery = ToolDiscovery(registry, provider, cfg.mode, self.search_fn)
 
+        skills = self._skill_store() if cfg.skills_enabled else None
+
         machine = StateMachine(
             cfg, self.db, run_id, scope, provider, registry, executor, planner,
             recovery, budget, discovery, progress=self.progress,
+            skills=skills, focus=cfg.skills_focus,
         )
         status = machine.run(start_state)
+
+        # Distill a reusable skill from what this run found (learning is on by default).
+        if skills is not None and cfg.skills_learn:
+            try:
+                from ..skills.writer import SkillWriter
+
+                SkillWriter(provider, self.db, run_id, skills).learn(cfg.objective)
+            except Exception as e:
+                log.warning("Skill learning failed: %s", e)
 
         # OSINT: breach checks for in-scope domains/emails (mode-gated).
         try:
@@ -151,6 +163,14 @@ class EngagementRunner:
 
         self.progress("done", f"Report ready: {outputs.get('html','')}", result["stats"])
         return result
+
+    def _skill_store(self):
+        from pathlib import Path
+
+        from ..skills.store import SkillStore
+
+        skills_dir = self.cfg.skills_dir or (Path.home() / ".nexus" / "skills")
+        return SkillStore(skills_dir)
 
     def _notify(self, run_id: str, status: str) -> None:
         import os
