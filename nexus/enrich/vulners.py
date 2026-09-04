@@ -24,7 +24,7 @@ class VulnersClient:
     def search(self, cve_id: str, limit: int = 5) -> list[dict]:
         cve_id = cve_id.upper()
         cache_key = f"vulners:{cve_id}"
-        cached = self.db.cache_get(cache_key)
+        cached = self.db.cache_get(cache_key, max_age=604800)
         if cached is not None:
             return cached.get("items", [])
         payload: dict = {"query": f"cve:{cve_id}", "size": limit}

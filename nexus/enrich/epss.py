@@ -22,7 +22,7 @@ class EpssClient:
     def score(self, cve_id: str) -> dict | None:
         cve_id = cve_id.upper()
         cache_key = f"epss:{cve_id}"
-        cached = self.db.cache_get(cache_key)
+        cached = self.db.cache_get(cache_key, max_age=86400)
         if cached is not None:
             return cached
         try:

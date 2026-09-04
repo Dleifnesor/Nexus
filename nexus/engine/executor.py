@@ -28,6 +28,7 @@ log = get_logger(__name__)
 
 INTRUSIVE_CATEGORIES = {"vuln", "exploit"}
 INSTALL_TIMEOUT = 1800
+MAX_PARSE_BYTES = 8 * 1024 * 1024  # cap tool stdout fed to parsers to bound memory
 
 
 @dataclass
@@ -117,7 +118,14 @@ class Executor:
 
         # Parse and persist
         try:
-            parsed = get_parser(entry.parser)(outcome._raw_stdout, target)  # type: ignore[attr-defined]
+            raw_stdout = outcome._raw_stdout or ""  # type: ignore[attr-defined]
+            if len(raw_stdout) > MAX_PARSE_BYTES:
+                log.warning(
+                    "Truncating %s output from %d to %d bytes before parsing",
+                    entry.name, len(raw_stdout), MAX_PARSE_BYTES,
+                )
+                raw_stdout = raw_stdout[:MAX_PARSE_BYTES]
+            parsed = get_parser(entry.parser)(raw_stdout, target)
             outcome.parsed = parsed
             outcome.new_assets, outcome.new_findings = self._persist(parsed, entry, phase)
         except Exception as e:  # parser failure -> recoverable

@@ -24,7 +24,7 @@ class KevClient:
     def _load(self) -> set[str]:
         if self._catalog is not None:
             return self._catalog
-        cached = self.db.cache_get("kev:catalog")
+        cached = self.db.cache_get("kev:catalog", max_age=86400)
         if cached is not None:
             self._catalog = set(cached.get("cves", []))
             return self._catalog

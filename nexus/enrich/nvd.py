@@ -9,30 +9,41 @@ import httpx
 
 from ..logging_ import get_logger
 from ..storage.db import Database
+from ._http import RateLimiter, request_with_retry
 
 log = get_logger(__name__)
 
 NVD_BASE = "https://services.nvd.nist.gov/rest/json/cves/2.0"
 CPE_BASE = "https://services.nvd.nist.gov/rest/json/cpes/2.0"
 
+# NVD public limits: ~5 requests / 30s without a key, ~50 / 30s with one.
+_INTERVAL_NO_KEY = 6.0
+_INTERVAL_KEY = 0.6
+_TTL = 7 * 24 * 3600  # CVE records change slowly; refetch weekly
+
 
 class NVDClient:
     def __init__(self, db: Database, api_key: str | None = None):
         self.db = db
         self.api_key = api_key
+        self._limiter = RateLimiter(_INTERVAL_KEY if api_key else _INTERVAL_NO_KEY)
 
     def _headers(self) -> dict:
         return {"apiKey": self.api_key} if self.api_key else {}
 
+    def _get(self, url: str, params: dict) -> httpx.Response:
+        return request_with_retry(
+            "GET", url, params=params, headers=self._headers(), timeout=30, limiter=self._limiter
+        )
+
     def lookup_cve(self, cve_id: str) -> dict | None:
         cve_id = cve_id.upper()
         cache_key = f"nvd:cve:{cve_id}"
-        cached = self.db.cache_get(cache_key)
+        cached = self.db.cache_get(cache_key, max_age=_TTL)
         if cached is not None:
             return cached
         try:
-            resp = httpx.get(NVD_BASE, params={"cveId": cve_id}, headers=self._headers(), timeout=30)
-            resp.raise_for_status()
+            resp = self._get(NVD_BASE, {"cveId": cve_id})
         except httpx.HTTPError as e:
             log.warning("NVD lookup failed for %s: %s", cve_id, e)
             return None
@@ -46,17 +57,11 @@ class NVDClient:
         if not keyword:
             return []
         cache_key = f"nvd:kw:{keyword.lower()}"
-        cached = self.db.cache_get(cache_key)
+        cached = self.db.cache_get(cache_key, max_age=_TTL)
         if cached is not None:
             return cached.get("items", [])
         try:
-            resp = httpx.get(
-                NVD_BASE,
-                params={"keywordSearch": keyword, "resultsPerPage": limit},
-                headers=self._headers(),
-                timeout=30,
-            )
-            resp.raise_for_status()
+            resp = self._get(NVD_BASE, {"keywordSearch": keyword, "resultsPerPage": limit})
         except httpx.HTTPError as e:
             log.warning("NVD search failed for %s: %s", keyword, e)
             return []
@@ -74,17 +79,11 @@ class NVDClient:
         if not keyword:
             return []
         cache_key = f"nvd:cpe:{keyword.lower()}"
-        cached = self.db.cache_get(cache_key)
+        cached = self.db.cache_get(cache_key, max_age=_TTL)
         if cached is not None:
             return cached.get("items", [])
         try:
-            resp = httpx.get(
-                CPE_BASE,
-                params={"keywordSearch": keyword, "resultsPerPage": limit},
-                headers=self._headers(),
-                timeout=30,
-            )
-            resp.raise_for_status()
+            resp = self._get(CPE_BASE, {"keywordSearch": keyword, "resultsPerPage": limit})
         except httpx.HTTPError as e:
             log.warning("NVD CPE search failed for %s: %s", keyword, e)
             return []
@@ -98,17 +97,11 @@ class NVDClient:
 
     def _cves_for_cpe(self, cpe_name: str, limit: int = 5) -> list[dict]:
         cache_key = f"nvd:cves-for-cpe:{cpe_name}"
-        cached = self.db.cache_get(cache_key)
+        cached = self.db.cache_get(cache_key, max_age=_TTL)
         if cached is not None:
             return cached.get("items", [])
         try:
-            resp = httpx.get(
-                NVD_BASE,
-                params={"cpeName": cpe_name, "resultsPerPage": limit},
-                headers=self._headers(),
-                timeout=30,
-            )
-            resp.raise_for_status()
+            resp = self._get(NVD_BASE, {"cpeName": cpe_name, "resultsPerPage": limit})
         except httpx.HTTPError as e:
             log.warning("NVD CPE->CVE lookup failed for %s: %s", cpe_name, e)
             return []

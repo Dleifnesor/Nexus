@@ -23,7 +23,7 @@ class GitHubPocClient:
     def has_poc(self, cve_id: str) -> bool:
         cve_id = cve_id.upper()
         cache_key = f"github-poc:{cve_id}"
-        cached = self.db.cache_get(cache_key)
+        cached = self.db.cache_get(cache_key, max_age=604800)
         if cached is not None:
             return bool(cached.get("found"))
         found = self._lookup(cve_id)

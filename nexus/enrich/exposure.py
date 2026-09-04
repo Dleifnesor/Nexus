@@ -26,7 +26,7 @@ class ExposureClient:
 
     def check_ip(self, ip: str) -> dict:
         cache_key = f"exposure:{ip}"
-        cached = self.db.cache_get(cache_key)
+        cached = self.db.cache_get(cache_key, max_age=86400)
         if cached is not None:
             return cached
         result = {"ip": ip, "greynoise": self._greynoise(ip), "shodan": self._shodan(ip)}

@@ -360,9 +360,17 @@ class Database:
         return {"phase": rows[0]["phase"], "state": json.loads(rows[0]["state_json"])}
 
     # -- enrichment cache ------------------------------------------------
-    def cache_get(self, key: str) -> dict | None:
-        rows = self._query("SELECT payload_json FROM enrichment_cache WHERE key=?", (key,))
-        return json.loads(rows[0]["payload_json"]) if rows else None
+    def cache_get(self, key: str, max_age: float | None = None) -> dict | None:
+        """Return a cached payload, or None. If max_age (seconds) is given, entries older
+        than that are treated as a miss so stale intel is refetched."""
+        rows = self._query(
+            "SELECT payload_json, fetched_at FROM enrichment_cache WHERE key=?", (key,)
+        )
+        if not rows:
+            return None
+        if max_age is not None and (time.time() - (rows[0]["fetched_at"] or 0)) > max_age:
+            return None
+        return json.loads(rows[0]["payload_json"])
 
     def cache_put(self, key: str, source: str, payload: dict) -> None:
         self._exec(
