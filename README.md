@@ -37,7 +37,7 @@ Only run Nexus against systems you are explicitly authorized to test.
 ## Install
 
 ```bash
-git clone https://github.com/Dleifnesor/Nexus && cd nexus
+git clone https://github.com/Dleifnesor/Nexus && cd Nexus
 ./scripts/install.sh
 ```
 
@@ -79,7 +79,8 @@ nexus --scope --web
 | `--scope-entry` / `--scope-file` | Provide scope non-interactively |
 | `--scope-exclude` | Exclude an IP/CIDR/domain from scope (repeatable) |
 | `--docker-network` | Docker network for containerized tools |
-| `--no-docker` | Run all tools natively on the host (auto-install missing ones) |
+| `--no-docker` | Run all tools natively on the host (auto-install missing built-in tools) |
+| `--allow-tool-install` | Permit installing LLM-discovered tools on the host (off by default; discovered tools are otherwise always containerized) |
 | `--rate-limit-ms` | Minimum ms between tool actions (pacing) |
 | `--max-concurrent` | Parallel tool actions per iteration (default 1) |
 | `--diff <id>` | Render a finding diff against a previous run |
@@ -194,9 +195,15 @@ tools in later phases.
 ### Native (host) execution
 
 By default, missing tools run in ephemeral Docker containers. To run everything directly on the
-host with no containerization, pass `--no-docker`; Nexus then installs any missing tool on demand
-via its configured `install` command (audit-logged) and executes it natively. Tools that must run
-on the host (e.g. `gvm`) are always native regardless of this flag.
+host with no containerization, pass `--no-docker`; Nexus then installs any missing **built-in**
+tool on demand via its hardcoded `install` command (audit-logged) and executes it natively. Tools
+that must run on the host (e.g. `gvm`) are always native regardless of this flag.
+
+**Dynamically discovered tools are treated as untrusted**: their install command and invocation
+are synthesized by the LLM from web-search results, so they are always confined to an ephemeral
+container and their install command is validated against a package-manager allowlist. If Docker
+is unavailable they are skipped rather than run on the host. To let discovered tools install and
+run natively (unsafe), pass `--allow-tool-install`.
 
 ### Greenbone / OpenVAS (GVM)
 

@@ -162,7 +162,7 @@ class Renderer:
             "version": "2.1.0",
             "runs": [
                 {
-                    "tool": {"driver": {"name": "Nexus", "informationUri": "https://github.com/nexus"}},
+                    "tool": {"driver": {"name": "Nexus", "informationUri": "https://github.com/Dleifnesor/Nexus"}},
                     "results": results,
                 }
             ],
