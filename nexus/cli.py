@@ -98,17 +98,14 @@ def _confirm_sandbox(assume_yes: bool) -> bool:
     return ans == "I ACCEPT"
 
 
-def _websearch(query: str) -> str:
-    """Best-effort web search backend for tool discovery.
-
-    Uses DuckDuckGo's HTML endpoint if reachable; returns an empty string on failure so the
-    discovery module degrades gracefully offline.
-    """
+def _http_websearch(query: str) -> str:
+    """HTTP-only fallback search: DuckDuckGo's HTML endpoint. Returns "" on failure so tool
+    discovery degrades gracefully when no browser is available."""
     import httpx
 
     try:
         resp = httpx.get(
-            "https://duckduckgo.com/html/",
+            "https://html.duckduckgo.com/html/",
             params={"q": query},
             headers={"User-Agent": "Mozilla/5.0 nexus-scanner"},
             timeout=20,
@@ -117,6 +114,18 @@ def _websearch(query: str) -> str:
         return resp.text[:8000]
     except Exception:
         return ""
+
+
+def _build_search_fn():
+    """Tool-discovery search backend: a real headless browser (Playwright) when available,
+    falling back to the HTTP endpoint otherwise."""
+    from .osint.browser import Browser
+
+    if Browser().available():
+        from .osint.search import WebSearch
+
+        return WebSearch(http_fallback=_http_websearch)
+    return _http_websearch
 
 
 def _run_checks(cfg: Config) -> int:
@@ -197,7 +206,7 @@ def main(argv: list[str] | None = None) -> int:
     setup_logging(cfg.log_dir)
     audit("cli.start", mode=mode.value, scope=scope_entries, resume=args.resume)
 
-    runner = EngagementRunner(cfg, search_fn=_websearch)
+    runner = EngagementRunner(cfg, search_fn=_build_search_fn())
     try:
         run_id = runner.prepare()  # resolve the real run id before binding dashboards
     except ValueError as e:

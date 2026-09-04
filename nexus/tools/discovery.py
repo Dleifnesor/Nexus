@@ -22,11 +22,15 @@ log = get_logger(__name__)
 SearchFn = Callable[[str], str]  # query -> summarized results text
 
 # The install string of a discovered tool is model-authored from web-search content, so it is
-# untrusted input that would otherwise be run through a shell. Only allow a package install
-# from a known manager, with package tokens drawn from a safe character set, and reject
-# anything containing shell metacharacters. A binary name must be a bare token (no path).
-_INSTALL_MANAGERS = ("apt-get install", "apt install", "pip install", "pip3 install",
-                     "go install", "gem install")
+# untrusted input that would otherwise be run through a shell. Only allow a single package
+# install from a known manager, with package tokens drawn from a safe character set, and reject
+# anything containing shell metacharacters (so no command chaining, substitution, or redirects
+# can be smuggled in). A binary name must be a bare token (no path).
+_INSTALL_MANAGERS = (
+    "apt-get install", "apt install",
+    "pip install", "pip3 install", "pipx install",
+    "go install", "gem install", "cargo install", "npm install",
+)
 _SHELL_METACHARS = re.compile(r"[;&|`$><\n\r()\\]")
 _PKG_TOKENS = re.compile(r"^[A-Za-z0-9 ._+/@:=-]+$")
 _BINARY_RE = re.compile(r"^[A-Za-z0-9._-]+$")
@@ -58,7 +62,9 @@ DISCOVERY_SCHEMA_HINT = {
     "name": "short-tool-name",
     "category": "recon|enumeration|vuln|web|osint|exploit",
     "when_to_use": "one sentence",
-    "install": "apt-get install -y <pkg>  OR  pip install <pkg>  OR  git clone ... ",
+    "install": "a SINGLE package-manager install only: apt-get install -y <pkg> | "
+    "pip install <pkg> | pipx install <pkg> | go install <pkg> | cargo install <pkg> | "
+    "gem install <pkg> | npm install -g <pkg>. No shell operators, pipes, or git clone.",
     "image": "docker image if a well-known one exists, else null",
     "cmd_template": ["binary", "{target}"],
     "parser": "generic",

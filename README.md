@@ -192,6 +192,25 @@ Missing tools are auto-discovered via web search or containerized with a Kali ba
 Discovered credentials are stored in a per-run credential store and reused by credential-aware
 tools in later phases.
 
+### Automatic tool discovery
+
+When the planner needs a capability no registered tool provides, Nexus finds and adds a new
+tool on its own:
+
+1. It runs a **browser-driven web search** (headless Chromium via Playwright), extracts the
+   top results, and fetches the most relevant pages — preferring GitHub, PyPI, pkg.go.dev,
+   and the Kali package site, which usually document the install command.
+   (If a browser isn't available it falls back to an HTTP search endpoint.)
+2. The LLM reads those results and synthesizes a registry entry — install command, run
+   command template, and output parser.
+3. The new tool is registered and used in the current and later phases.
+
+Because the install command and invocation are derived from untrusted web content, discovered
+tools are **run in an ephemeral container by default** and their install command is validated
+against a package-manager allowlist (`apt`/`pip`/`pipx`/`go`/`cargo`/`gem`/`npm` installs only;
+anything with shell operators is rejected). Pass `--allow-tool-install` to instead install and
+run discovered tools natively on the host.
+
 ### Native (host) execution
 
 By default, missing tools run in ephemeral Docker containers. To run everything directly on the
