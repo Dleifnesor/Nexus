@@ -56,6 +56,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-tui", action="store_true", help="Disable the live TUI dashboard")
     p.add_argument("--docker-network", default=None, help="Docker network for containerized tools")
     p.add_argument("--no-docker", action="store_true", help="Run all tools natively on the host (no containers)")
+    p.add_argument(
+        "--allow-tool-install",
+        action="store_true",
+        help="Permit installing LLM-discovered tools on the host (unsafe; off by default, "
+        "discovered tools are otherwise always containerized)",
+    )
     p.add_argument("--rate-limit-ms", type=int, default=0, help="Min ms between tool actions (0 = disabled)")
     p.add_argument("--max-concurrent", type=int, default=1, help="Max parallel tool actions per iteration")
     p.add_argument("-y", "--yes", action="store_true", help="Assume yes to confirmations")
@@ -180,6 +186,7 @@ def main(argv: list[str] | None = None) -> int:
         enable_web=args.web,
         docker_network=args.docker_network,
         docker_enabled=not args.no_docker,
+        allow_tool_install=args.allow_tool_install,
         rate_limit_ms=args.rate_limit_ms,
         max_concurrent=args.max_concurrent,
         resume_run_id=args.resume,

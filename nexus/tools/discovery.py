@@ -9,6 +9,7 @@ backend is available (or a stub in offline mode).
 """
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 
 from ..config import Mode
@@ -19,6 +20,38 @@ from .registry import Registry, ToolEntry
 log = get_logger(__name__)
 
 SearchFn = Callable[[str], str]  # query -> summarized results text
+
+# The install string of a discovered tool is model-authored from web-search content, so it is
+# untrusted input that would otherwise be run through a shell. Only allow a package install
+# from a known manager, with package tokens drawn from a safe character set, and reject
+# anything containing shell metacharacters. A binary name must be a bare token (no path).
+_INSTALL_MANAGERS = ("apt-get install", "apt install", "pip install", "pip3 install",
+                     "go install", "gem install")
+_SHELL_METACHARS = re.compile(r"[;&|`$><\n\r()\\]")
+_PKG_TOKENS = re.compile(r"^[A-Za-z0-9 ._+/@:=-]+$")
+_BINARY_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+
+
+def sanitize_install(install: str) -> str:
+    """Return the install command if it is a safe single package-manager install, else ""."""
+    cmd = (install or "").strip()
+    if not cmd:
+        return ""
+    if _SHELL_METACHARS.search(cmd):
+        return ""
+    manager = next((m for m in _INSTALL_MANAGERS if cmd.startswith(m + " ")), None)
+    if manager is None:
+        return ""
+    args = cmd[len(manager):].strip()
+    # allow a leading "-y" for apt; validate the remaining package tokens
+    args = re.sub(r"^-y\s+", "", args)
+    if not args or not _PKG_TOKENS.match(args):
+        return ""
+    return cmd
+
+
+def valid_binary(cmd_template: list[str]) -> bool:
+    return bool(cmd_template) and bool(_BINARY_RE.match(str(cmd_template[0])))
 
 
 DISCOVERY_SCHEMA_HINT = {
@@ -69,19 +102,32 @@ class ToolDiscovery:
             log.warning("Discovery synthesis failed: %s", e)
             return None
 
+        cmd_template = list(data.get("cmd_template") or [])
+        raw_install = str(data.get("install") or "")
+        safe_install = sanitize_install(raw_install)
+        if raw_install and not safe_install:
+            log.warning(
+                "Discovered tool install command rejected by sanitizer: %r", raw_install
+            )
         entry = ToolEntry(
             name=str(data.get("name") or "").strip() or f"discovered-{abs(hash(query)) % 10000}",
             category=str(data.get("category") or "recon"),
             when_to_use=str(data.get("when_to_use") or query),
             builtin=False,  # discovered tools always run in a container
-            cmd_template=list(data.get("cmd_template") or []),
-            install=str(data.get("install") or ""),
+            cmd_template=cmd_template,
+            install=safe_install,
             image=data.get("image") or None,
             parser=str(data.get("parser") or "generic"),
             phases=[],  # available to all phases
         )
         if not entry.cmd_template:
             log.warning("Discovered tool %s has no command template; discarding", entry.name)
+            return None
+        if not valid_binary(entry.cmd_template):
+            log.warning(
+                "Discovered tool %s has an unsafe binary name %r; discarding",
+                entry.name, entry.cmd_template[0] if entry.cmd_template else None,
+            )
             return None
         self.registry.add(entry)
         audit(

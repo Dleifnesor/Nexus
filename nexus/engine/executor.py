@@ -55,6 +55,7 @@ class Executor:
         max_retries: int = 2,
         rate_limit_ms: int = 0,
         containerize: bool = True,
+        allow_tool_install: bool = False,
     ):
         self.db = db
         self.registry = registry
@@ -64,6 +65,7 @@ class Executor:
         self.max_retries = max_retries
         self.rate_limit_ms = rate_limit_ms
         self.containerize = containerize
+        self.allow_tool_install = allow_tool_install
         self._last_action_at = 0.0
         self._throttle_lock = threading.Lock()
         self._installing: set[str] = set()
@@ -142,12 +144,30 @@ class Executor:
         if entry.builtin and tool_available(binary):
             return self._run_host(entry, argv, target)
 
-        # Host-native execution: never containerize, install on demand.
+        # Discovered (LLM-synthesized) tools are never trusted to install/run on the host by
+        # default: their install command and argv originate from web search + the model, so we
+        # always confine them to an ephemeral container. If Docker is unavailable we skip the
+        # tool (recorded as a failure) rather than shell out on the host. Opt back into host
+        # execution explicitly with --allow-tool-install.
+        discovered = not entry.builtin and not entry.host_only
+        if discovered and not self.allow_tool_install:
+            if not self.docker.available():
+                return ActionOutcome(
+                    False, entry.name, target, 1,
+                    error="discovered tool requires Docker (unavailable); skipped for safety",
+                )
+            return self._run_container(entry, argv, target)
+
+        # Host-native execution for trusted/built-in tools (and, when opted in, discovered
+        # tools under --no-docker): never containerize, install on demand.
         if entry.host_only or not self.containerize:
             self._install_host(entry)
             return self._run_host(entry, argv, target)
 
         # non-builtin OR builtin binary missing -> container
+        return self._run_container(entry, argv, target)
+
+    def _run_container(self, entry: ToolEntry, argv: list[str], target: str) -> ActionOutcome:
         image = entry.image or "kalilinux/kali-rolling"
         cres: ContainerResult = self.docker.run(
             argv, image=image, install=entry.install, timeout=entry.timeout

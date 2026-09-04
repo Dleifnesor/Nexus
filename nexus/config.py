@@ -53,6 +53,7 @@ class Config:
     enable_web: bool = False
     docker_network: str | None = None  # container network policy override
     docker_enabled: bool = True  # False = run all tools natively on the host
+    allow_tool_install: bool = False  # allow installing LLM-discovered tools on the host
     rate_limit_ms: int = 0  # min milliseconds between actions (0 = disabled)
     max_concurrent: int = 1  # max parallel tool actions per phase iteration
     nvd_api_key: str | None = None

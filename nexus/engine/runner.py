@@ -87,6 +87,7 @@ class EngagementRunner:
             self.db, registry, scope, docker, run_id,
             rate_limit_ms=cfg.rate_limit_ms,
             containerize=cfg.docker_enabled,
+            allow_tool_install=cfg.allow_tool_install,
         )
         planner = Planner(provider, registry)
         recovery = Recovery(provider, registry, self.db, run_id)
