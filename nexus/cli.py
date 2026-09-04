@@ -57,10 +57,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--docker-network", default=None, help="Docker network for containerized tools")
     p.add_argument("--no-docker", action="store_true", help="Run all tools natively on the host (no containers)")
     p.add_argument(
-        "--allow-tool-install",
+        "--no-tool-search",
         action="store_true",
-        help="Permit installing LLM-discovered tools on the host (unsafe; off by default, "
-        "discovered tools are otherwise always containerized)",
+        help="Disable automatic discovery and installation of new tools via web search "
+        "(enabled by default)",
     )
     p.add_argument("--rate-limit-ms", type=int, default=0, help="Min ms between tool actions (0 = disabled)")
     p.add_argument("--max-concurrent", type=int, default=1, help="Max parallel tool actions per iteration")
@@ -195,7 +195,7 @@ def main(argv: list[str] | None = None) -> int:
         enable_web=args.web,
         docker_network=args.docker_network,
         docker_enabled=not args.no_docker,
-        allow_tool_install=args.allow_tool_install,
+        tool_search=not args.no_tool_search,
         rate_limit_ms=args.rate_limit_ms,
         max_concurrent=args.max_concurrent,
         resume_run_id=args.resume,
@@ -206,7 +206,10 @@ def main(argv: list[str] | None = None) -> int:
     setup_logging(cfg.log_dir)
     audit("cli.start", mode=mode.value, scope=scope_entries, resume=args.resume)
 
-    runner = EngagementRunner(cfg, search_fn=_build_search_fn())
+    # Tool discovery is enabled by default; --no-tool-search wires in no search backend, so
+    # the discovery module becomes a no-op and no new tools are found or installed.
+    search_fn = _build_search_fn() if cfg.tool_search else None
+    runner = EngagementRunner(cfg, search_fn=search_fn)
     try:
         run_id = runner.prepare()  # resolve the real run id before binding dashboards
     except ValueError as e:

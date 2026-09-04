@@ -64,3 +64,23 @@ def test_websearch_is_callable(monkeypatch):
     ws = WebSearch(http_fallback=lambda q: "X")
     monkeypatch.setattr(ws, "_browser_gather", lambda q: ([], []))
     assert ws("q") == "X"  # __call__ delegates to run
+
+
+# -- CLI wiring: discovery on by default, --no-tool-search disables it -------
+def test_cli_tool_search_defaults_on_and_can_disable():
+    from nexus.cli import build_parser
+
+    parser = build_parser()
+    default = parser.parse_args(["--sandbox", "--scope-entry", "10.0.0.1"])
+    assert default.no_tool_search is False
+
+    disabled = parser.parse_args(["--sandbox", "--scope-entry", "10.0.0.1", "--no-tool-search"])
+    assert disabled.no_tool_search is True
+
+
+def test_config_defaults_enable_discovery_and_install():
+    from nexus.config import Config, Mode
+
+    cfg = Config(mode=Mode.SANDBOX)
+    assert cfg.tool_search is True
+    assert cfg.allow_tool_install is True

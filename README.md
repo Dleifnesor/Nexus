@@ -80,7 +80,7 @@ nexus --scope --web
 | `--scope-exclude` | Exclude an IP/CIDR/domain from scope (repeatable) |
 | `--docker-network` | Docker network for containerized tools |
 | `--no-docker` | Run all tools natively on the host (auto-install missing built-in tools) |
-| `--allow-tool-install` | Permit installing LLM-discovered tools on the host (off by default; discovered tools are otherwise always containerized) |
+| `--no-tool-search` | Disable automatic discovery/installation of new tools via web search (on by default) |
 | `--rate-limit-ms` | Minimum ms between tool actions (pacing) |
 | `--max-concurrent` | Parallel tool actions per iteration (default 1) |
 | `--diff <id>` | Render a finding diff against a previous run |
@@ -205,11 +205,13 @@ tool on its own:
    command template, and output parser.
 3. The new tool is registered and used in the current and later phases.
 
-Because the install command and invocation are derived from untrusted web content, discovered
-tools are **run in an ephemeral container by default** and their install command is validated
-against a package-manager allowlist (`apt`/`pip`/`pipx`/`go`/`cargo`/`gem`/`npm` installs only;
-anything with shell operators is rejected). Pass `--allow-tool-install` to instead install and
-run discovered tools natively on the host.
+Discovery and installation are **enabled by default**; pass `--no-tool-search` to turn the
+whole feature off (no web searches, no new tools). Discovered tools run wherever your Docker
+setting dictates — in an ephemeral container by default, or natively on the host under
+`--no-docker`. Because the install command and invocation are derived from untrusted web
+content, the install command is validated against a package-manager allowlist
+(`apt`/`pip`/`pipx`/`go`/`cargo`/`gem`/`npm` installs only; anything with shell operators is
+rejected), so only a single package install can ever run — never an arbitrary shell command.
 
 ### Native (host) execution
 
@@ -218,11 +220,11 @@ host with no containerization, pass `--no-docker`; Nexus then installs any missi
 tool on demand via its hardcoded `install` command (audit-logged) and executes it natively. Tools
 that must run on the host (e.g. `gvm`) are always native regardless of this flag.
 
-**Dynamically discovered tools are treated as untrusted**: their install command and invocation
-are synthesized by the LLM from web-search results, so they are always confined to an ephemeral
-container and their install command is validated against a package-manager allowlist. If Docker
-is unavailable they are skipped rather than run on the host. To let discovered tools install and
-run natively (unsafe), pass `--allow-tool-install`.
+**Dynamically discovered tools** have their install command synthesized by the LLM from
+web-search results, so it is validated against a package-manager allowlist (a single
+`apt`/`pip`/`pipx`/`go`/`cargo`/`gem`/`npm` install; no shell operators) before it runs. Under
+`--no-docker` they install and run natively like any other tool; otherwise they run in an
+ephemeral container. Disable discovery entirely with `--no-tool-search`.
 
 ### Greenbone / OpenVAS (GVM)
 

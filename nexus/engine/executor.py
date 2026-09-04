@@ -152,11 +152,10 @@ class Executor:
         if entry.builtin and tool_available(binary):
             return self._run_host(entry, argv, target)
 
-        # Discovered (LLM-synthesized) tools are never trusted to install/run on the host by
-        # default: their install command and argv originate from web search + the model, so we
-        # always confine them to an ephemeral container. If Docker is unavailable we skip the
-        # tool (recorded as a failure) rather than shell out on the host. Opt back into host
-        # execution explicitly with --allow-tool-install.
+        # When host installation of discovered tools is disallowed (allow_tool_install=False),
+        # confine LLM-synthesized tools to an ephemeral container regardless of --no-docker,
+        # and skip them if Docker is unavailable rather than shelling out on the host. With the
+        # default (allow_tool_install=True) they follow the normal host/container routing below.
         discovered = not entry.builtin and not entry.host_only
         if discovered and not self.allow_tool_install:
             if not self.docker.available():
