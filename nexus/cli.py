@@ -191,24 +191,35 @@ def main(argv: list[str] | None = None) -> int:
     audit("cli.start", mode=mode.value, scope=scope_entries, resume=args.resume)
 
     runner = EngagementRunner(cfg, search_fn=_websearch)
-    run_id = cfg.resume_run_id or "pending"
+    try:
+        run_id = runner.prepare()  # resolve the real run id before binding dashboards
+    except ValueError as e:
+        print(f"Error: {e}")
+        runner.close()
+        return 2
 
+    result = None
     dashboard = Dashboard(run_id, mode.value, enabled=not args.no_tui)
     try:
         with dashboard:
-            # rebind progress once we know the run_id (set on first emit)
             runner.progress = dashboard.progress
             if cfg.enable_web:
-                start_web_dashboard(cfg.db_path, run_id if run_id != "pending" else "")
+                start_web_dashboard(cfg.db_path, run_id)
             result = runner.run()
             if args.diff:
                 _render_diff(cfg, result["run_id"], args.diff)
     except KeyboardInterrupt:
         print("\nInterrupted.")
         return 130
+    except Exception as e:  # never dump a raw traceback at the user
+        log_exc = str(e) or e.__class__.__name__
+        print(f"\nRun failed: {log_exc}")
+        return 1
     finally:
         runner.close()
 
+    if result is None:  # defensive: run() returned nothing
+        return 1
     print(f"\nRun {result['run_id']} finished with status: {result['status']}")
     for fmt, path in result["reports"].items():
         print(f"  {fmt.upper()}: {path}")

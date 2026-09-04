@@ -45,25 +45,39 @@ class EngagementRunner:
         self.progress = progress or (lambda *a: None)
         self.search_fn = search_fn
         self.db = Database(cfg.db_path)
+        self.run_id: str | None = None
+        self._scope: Scope | None = None
+        self._start_state = None
 
-    def run(self) -> dict:
+    def prepare(self) -> str:
+        """Resolve (or create) the run id up front so callers can bind dashboards to the
+        real run before execution starts. Idempotent."""
+        if self.run_id is not None:
+            return self.run_id
         cfg = self.cfg
-        scope = Scope.parse(cfg.mode, cfg.scope_raw, cfg.scope_exclusions)
-
+        self._scope = Scope.parse(cfg.mode, cfg.scope_raw, cfg.scope_exclusions)
         if cfg.resume_run_id:
             run_id = cfg.resume_run_id
             if self.db.get_run(run_id) is None:
                 raise ValueError(f"Cannot resume unknown run: {run_id}")
-            start_state = load_checkpoint(self.db, run_id)
-            log.info("Resuming run %s at phase index %d", run_id, start_state.phase_index)
+            self._start_state = load_checkpoint(self.db, run_id)
+            log.info("Resuming run %s at phase index %d", run_id, self._start_state.phase_index)
         else:
             run_id = self.db.create_run(
                 cfg.mode.value,
-                {"raw": scope.raw},
+                {"raw": self._scope.raw},
                 cfg.budgets.__dict__,
                 cfg.to_dict(),
             )
-            start_state = None
+            self._start_state = None
+        self.run_id = run_id
+        return run_id
+
+    def run(self) -> dict:
+        cfg = self.cfg
+        run_id = self.prepare()
+        scope = self._scope
+        start_state = self._start_state
 
         counter = TokenCounter()
         provider = build_provider(cfg.llm, counter)

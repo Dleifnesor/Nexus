@@ -95,6 +95,7 @@ class FindingEnricher:
                 cve_ids != original
                 or best_score != f["cvss"]
                 or best_epss != f["epss"]
+                or severity != (f["severity"] or "info")
                 or exploit_available != bool(f["exploit_available"])
             )
             if changed:

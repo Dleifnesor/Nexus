@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from ..config import Config
 from ..llm.provider import BaseProvider
 from ..logging_ import audit, get_logger
-from ..scope.scope import Scope
+from ..scope.scope import Scope, _parse_entry
 from ..storage.db import Database
 from ..tools.discovery import ToolDiscovery
 from ..tools.registry import Registry
@@ -136,8 +136,11 @@ class StateMachine:
 
             context = self._build_context(phase.key)
 
-            # Propose up to max_concurrent run_tool actions in this iteration.
+            # Propose up to max_concurrent run_tool actions in this iteration. The planner
+            # sees identical context for each call, so dedupe by (tool, target, args) to
+            # avoid running the same action several times in one parallel batch.
             proposals = []
+            seen: set[tuple] = set()
             for _ in range(max(1, self.cfg.max_concurrent)):
                 proposal = self.planner.next_action(phase.key, phase.goal, context)
                 if proposal.action_type == "finish_phase":
@@ -147,6 +150,10 @@ class StateMachine:
                     self._emit(phase.key, f"Discovering tool: {proposal.discovery_query}")
                     self.discovery.discover(proposal.discovery_query or context[:120])
                     break
+                key = (proposal.tool, proposal.target, tuple(proposal.args))
+                if key in seen:
+                    continue
+                seen.add(key)
                 proposals.append(proposal)
 
             if not proposals:
@@ -176,7 +183,10 @@ class StateMachine:
 
             for proposal, outcome in zip(proposals, outcomes, strict=False):
                 if not outcome.ok:
-                    self._handle_failure(phase.key, proposal.tool, proposal.target, outcome.error)
+                    self._handle_failure(
+                        phase.key, proposal.tool, proposal.target, outcome.error,
+                        scope_denied=outcome.scope_denied,
+                    )
                 elif outcome.parsed:
                     for a in outcome.parsed.assets:
                         if a.type in ("service", "url", "host", "domain"):
@@ -203,13 +213,23 @@ class StateMachine:
             host = entry.strip()
             if not host:
                 continue
-            type_ = "domain" if any(c.isalpha() for c in host) and "/" not in host else "host"
+            # Classify via the same parser the scope gate uses so IPv6 (which contains hex
+            # letters) and CIDRs are treated as hosts, not domains.
+            parsed = _parse_entry(host)
+            type_ = "domain" if isinstance(parsed, str) else "host"
             if self.db.add_asset(self.run_id, type_, host, source="scope", phase="preflight"):
                 seeded += 1
         self._emit("preflight", f"Seeded {seeded} assets from scope.")
 
     # -- helpers ---------------------------------------------------------
-    def _handle_failure(self, phase: str, tool: str, target: str, error: str) -> None:
+    def _handle_failure(
+        self, phase: str, tool: str, target: str, error: str, scope_denied: bool = False
+    ) -> None:
+        # A scope refusal can never succeed on retry or via another tool; record the gap and
+        # skip the (wasted) LLM recovery round-trip entirely.
+        if scope_denied:
+            self.recovery.record_gap(tool, target, error, "out_of_scope")
+            return
         decision = self.recovery.decide(tool, target, "", error)
         if decision.strategy == "retry":
             outcome = self.executor.run_tool(tool, target, phase)

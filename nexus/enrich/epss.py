@@ -34,6 +34,18 @@ class EpssClient:
         data = resp.json().get("data") or []
         if not data:
             return None
-        result = {"epss": data[0].get("epss"), "percentile": data[0].get("percentile")}
+        # The FIRST API returns epss/percentile as strings; coerce to float so downstream
+        # numeric comparisons and risk math don't hit str-vs-float TypeErrors.
+        result = {
+            "epss": _to_float(data[0].get("epss")),
+            "percentile": _to_float(data[0].get("percentile")),
+        }
         self.db.cache_put(cache_key, "epss", result)
         return result
+
+
+def _to_float(value) -> float | None:
+    try:
+        return float(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None

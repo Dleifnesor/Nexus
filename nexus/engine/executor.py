@@ -41,6 +41,7 @@ class ActionOutcome:
     timed_out: bool = False
     new_assets: int = 0
     new_findings: int = 0
+    scope_denied: bool = False  # target was refused by the scope gate (never retryable)
 
 
 class Executor:
@@ -88,7 +89,7 @@ class Executor:
             self.scope.enforce(target, action=f"{tool_name}({entry.category})")
         except ScopeError as e:
             self.db.add_error(self.run_id, "scope", str(e))
-            return ActionOutcome(False, tool_name, target, 1, error=str(e))
+            return ActionOutcome(False, tool_name, target, 1, error=str(e), scope_denied=True)
         if entry.category in INTRUSIVE_CATEGORIES:
             audit("action.intrusive", tool=tool_name, target=target, category=entry.category, phase=phase)
 
@@ -121,6 +122,7 @@ class Executor:
             outcome.ok = False
             outcome.error = f"parser '{entry.parser}' failed: {e}"
             self.db.add_error(self.run_id, "parse_error", outcome.error, action_id=action_id)
+            self.db.finish_action(action_id, "parse_error", outcome.exit_code, outcome.error[:2000])
         return outcome
 
     def _run_with_retries(self, entry: ToolEntry, argv: list[str], target: str) -> ActionOutcome:

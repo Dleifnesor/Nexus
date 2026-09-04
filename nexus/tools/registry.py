@@ -349,9 +349,13 @@ class Registry:
     def all(self) -> list[ToolEntry]:
         return list(self._tools.values())
 
-    def for_phase(self, phase: str) -> list[ToolEntry]:
+    def for_phase(self, phase: str | None) -> list[ToolEntry]:
+        # An empty/None phase means "no filter": return every registered tool. A concrete
+        # phase returns tools scoped to it, plus phaseless (discovered) tools available to all.
+        if not phase:
+            return list(self._tools.values())
         return [t for t in self._tools.values() if phase in t.phases or not t.phases]
 
-    def describe_for_phase(self, phase: str) -> str:
+    def describe_for_phase(self, phase: str | None) -> str:
         lines = [f"- {t.name}: {t.when_to_use}" for t in self.for_phase(phase)]
         return "\n".join(lines) if lines else "(none)"

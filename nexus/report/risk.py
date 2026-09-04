@@ -78,23 +78,31 @@ def _node_id(value: str) -> str:
     return re.sub(r"\W", "_", value)[:40]
 
 
+def _label(value: str, limit: int = 40) -> str:
+    """Sanitize text for a Mermaid node label: strip quotes/brackets/newlines that would
+    otherwise break the diagram syntax."""
+    cleaned = re.sub(r'["\[\]{}|<>]', " ", str(value))
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned[:limit] or "?"
+
+
 def build_attack_graph(assets: list[dict], findings: list[dict]) -> str:
     """Render a Mermaid attack-path graph from assets and findings."""
     hosts = [a["value"] for a in assets if a["type"] == "host"]
     services = [a["value"] for a in assets if a["type"] == "service"]
     lines = ["graph TD"]
     for h in hosts:
-        lines.append(f'  H_{_node_id(h)}["{h}"]')
+        lines.append(f'  H_{_node_id(h)}["{_label(h)}"]')
     for s in services:
         sid = _node_id(s)
-        lines.append(f'  S_{sid}["{s}"]')
+        lines.append(f'  S_{sid}["{_label(s)}"]')
         for h in hosts:
             if h in s:
                 lines.append(f"  H_{_node_id(h)} --> S_{sid}")
                 break
     for f in findings:
         fid = _node_id(f["title"])
-        lines.append(f'  F_{fid}["{f["title"][:40]}"]')
+        lines.append(f'  F_{fid}["{_label(f["title"])}"]')
         text = f["evidence"] or f["title"]
         linked = False
         for h in hosts:
